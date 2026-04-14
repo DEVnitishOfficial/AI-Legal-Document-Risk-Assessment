@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as userService from "./user.service";
+import { loginUser } from "./user.service";
 
 export const register = async (
   req: Request,
@@ -18,6 +19,23 @@ export const register = async (
     });
   } catch (err) {
     console.error("Registration Error:", err); // ADD THIS LINE
+    res.status(500).json({
+      success: false,
+      message: "Error registering user",
+      data: null,
+    });
+  }
+};
+
+export const login = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await loginUser(req.body.email, req.body.password);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
     next(err);
   }
 };

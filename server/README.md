@@ -329,3 +329,105 @@ POST /api/v1/users/register
 * Login API
 * Protected routes
 
+# 🔐 Authentication System (Phase 2)
+
+---
+
+## 📌 Overview
+
+This phase implements **secure authentication** using:
+
+* bcrypt (password hashing)
+* JWT (authentication tokens)
+* Protected routes (middleware)
+
+---
+
+## 🔑 Features Implemented
+
+* User Registration with hashed password
+* User Login with token generation
+* JWT-based authentication
+* Protected API routes
+
+---
+
+## 📦 Dependencies
+
+```bash
+npm install bcrypt jsonwebtoken
+```
+
+---
+
+## 🔐 Password Hashing
+
+Passwords are securely hashed using bcrypt before storing in the database.
+
+---
+
+## 🔑 JWT Token
+
+* Token generated on login
+* Contains user ID and email
+* Expires in 7 days
+
+---
+
+## 🌐 API Endpoints
+
+### ➤ Register
+
+```
+POST /api/v1/users/register
+```
+
+---
+
+### ➤ Login
+
+```
+POST /api/v1/users/login
+```
+
+---
+
+### ➤ Get Current User (Protected)
+
+```
+GET /api/v1/users/me
+```
+
+Header:
+
+```
+Authorization: Bearer <token>
+```
+
+---
+
+## 🔒 Authentication Flow
+
+1. User registers → password hashed
+2. User logs in → receives JWT
+3. Token sent in request headers
+4. Middleware verifies token
+5. Access granted to protected routes
+
+---
+
+## ✅ Result
+
+* Secure authentication system implemented
+* Protected routes working
+* Tokens validated successfully
+
+---
+
+## 🚀 Next Steps
+
+* File upload system (PDF/DOCX)
+* Document processing
+* AI integration
+
+---
