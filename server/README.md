@@ -431,3 +431,122 @@ Authorization: Bearer <token>
 * AI integration
 
 ---
+
+# 📄 Document Upload & Processing (Phase 3)
+
+---
+
+## 📌 Overview
+
+This phase implements the **document upload and processing system**, which is a core feature of the application.
+
+Users can upload legal documents (PDF), which are:
+
+* Stored on the server
+* Saved in the database
+* Processed to extract text
+
+---
+
+## 🔑 Features Implemented
+
+* File upload using Multer
+* PDF text extraction using pdf-parse
+* Document storage in PostgreSQL
+* Protected upload route (JWT required)
+
+---
+
+## 📦 Dependencies
+
+```bash
+npm install multer pdf-parse
+
+use specific version to properly working: npm install pdf-parse@1.1.1
+```
+
+---
+
+## 📁 File Storage
+
+Uploaded files are stored locally:
+
+```
+/uploads
+```
+
+Each file is renamed with a unique timestamp to avoid conflicts.
+
+---
+
+## 🗄️ Database Integration
+
+When a file is uploaded:
+
+* A record is created in the `documents` table
+* Linked to the user via `user_id`
+
+---
+
+## 📄 Text Extraction
+
+PDF files are processed using `pdf-parse` to extract raw text.
+
+This text will be used in future phases for:
+
+* AI summarization
+* Clause extraction
+* Risk analysis
+
+---
+
+## 🌐 API Endpoint
+
+### ➤ Upload Document (Protected)
+
+```
+POST /api/v1/documents/upload
+```
+
+### Headers
+
+```
+Authorization: Bearer <token>
+```
+
+### Body (form-data)
+
+```
+file: <PDF file>
+```
+
+---
+
+## 🔄 Flow
+
+1. User sends request with file
+2. Middleware verifies JWT
+3. File stored on server
+4. Entry saved in database
+5. Text extracted from PDF
+6. Response returned with preview
+
+---
+
+## ✅ Result
+
+* File successfully uploaded
+* Stored locally
+* Metadata saved in DB
+* Text extracted successfully
+
+---
+
+## 🚀 Next Steps
+
+* AI Integration (OpenAI)
+* Document summarization
+* Clause extraction
+* Risk detection
+
+---
