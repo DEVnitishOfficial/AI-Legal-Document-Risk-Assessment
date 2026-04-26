@@ -548,5 +548,110 @@ file: <PDF file>
 * Document summarization
 * Clause extraction
 * Risk detection
+---
 
+# 🤖 AI Integration (Phase 4)
+
+---
+
+## 📌 Overview
+
+This phase integrates **OpenAI (LLM)** into the system to analyze legal documents.
+
+The system can now:
+
+* Summarize documents
+* Extract important clauses
+* Detect risk levels
+* Explain risky sections
+
+---
+
+## 🔑 Features Implemented
+
+* OpenAI API integration
+* Prompt-based document analysis
+* JSON structured AI response
+* Analysis stored in database
+
+---
+
+## 📦 Dependencies
+
+```bash
+npm install openai
+```
+
+---
+
+## 🔐 Environment Setup
+
+```env
+OPENAI_API_KEY=your_api_key
+```
+
+---
+
+## 🧠 AI Capabilities
+
+The AI performs:
+
+* 📄 Summary (simple English)
+* 📌 Clause extraction
+* ⚠️ Risk detection (Low / Medium / High)
+* 🧾 Risk explanations
+
+---
+
+## 🌐 API Endpoint
+
+### ➤ Run Analysis (Protected)
+
+```
+POST /api/v1/analysis/run
+```
+
+### Headers
+
+```
+Authorization: Bearer <token>
+```
+
+### Body
+
+```json
+{
+  "documentId": 1,
+  "filePath": "uploads/file.pdf"
+}
+```
+
+---
+
+## 🔄 Flow
+
+1. Request sent with document info
+2. Text extracted from file
+3. Text sent to OpenAI
+4. AI processes document
+5. Result returned in JSON
+6. Data stored in database
+
+---
+
+## ⚠️ Optimization
+
+To reduce API cost:
+
+* Text length limited to 4000 characters
+* Efficient prompt design
+* Minimal API calls
+
+---
+
+## ✅ Result
+
+* AI successfully analyzes documents
+* Summary, clauses, and risks generated
+* Results stored in database
 ---

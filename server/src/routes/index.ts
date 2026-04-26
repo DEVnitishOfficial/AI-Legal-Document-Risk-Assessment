@@ -1,6 +1,7 @@
 import { Router } from "express";
 import userRoutes from "../modules/user/user.routes";
 import documentRoutes from "../modules/document/document.routes";
+import analysisRoutes from "../modules/analysis/analysis.route";
 
 
 const router = Router();
@@ -13,5 +14,6 @@ router.get("/", (req, res) => {
 
 router.use("/users", userRoutes);
 router.use("/documents", documentRoutes);
+router.use("/analysis", analysisRoutes);
 
 export default router;
