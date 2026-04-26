@@ -9,4 +9,5 @@ export const env = {
   DB_USER: process.env.DB_USER!,
   DB_PASSWORD: process.env.DB_PASSWORD!,
   DB_NAME: process.env.DB_NAME!,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
 };

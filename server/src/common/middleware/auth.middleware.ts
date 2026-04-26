@@ -9,7 +9,6 @@ interface AuthRequest extends Request {
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-  console.log("Auth middleware invoked");
   try {
     const authHeader = req.headers.authorization;
 
@@ -19,17 +18,13 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 
     const token = authHeader.split(" ")[1];
 
-    console.log('coming token', token)
-
     const decodedToken = jwt.verify(token, env.JWT_SECRET);
-    console.log('decoded token>>>>', decodedToken)
 
     req.user = decodedToken as User;
-    console.log('User attached to request:', req.user);
     console.log('Auth middleware completed successfully');
     next();
   } catch (err) {
-    console.log('Error in auth middleware:', err);
+    console.error('Error in auth middleware:', err);
     next(new AppError("Invalid token", 401));
   }
 };
