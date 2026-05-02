@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { uploadDocument } from "./document.service";
+import { createTextDoc, uploadDocument } from "./document.service";
 import { User } from "../../types/userType";
 
 interface docRequest extends Request {
@@ -7,17 +7,13 @@ interface docRequest extends Request {
 }
 
 export const uploadDoc = async (req: docRequest, res: Response, next: NextFunction) => {
-  console.log("Upload document controller invoked");
   try {
-    console.log('Request user:', req.user);
-    console.log('Request file:', req.file);
 
     if(!req.user || !req.user.id) {
       throw new Error("User not authenticated");
     }
 
     const userId: number = req.user.id;
-    console.log('User ID from token:', userId);
 
     if (!req.file) {
       throw new Error("No file uploaded");
@@ -31,6 +27,22 @@ export const uploadDoc = async (req: docRequest, res: Response, next: NextFuncti
     });
   } catch (err) {
     console.error("Error in uploadDoc controller:", err);
+    next(err);
+  }
+};
+
+  export const createTextDocumentController = async (req: any, res:Response, next:NextFunction) => {
+  try {
+    const userId = req.user.id;
+    const { content } = req.body;
+
+    const result = await createTextDoc(userId, content);
+
+    res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
     next(err);
   }
 };

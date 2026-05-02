@@ -1,14 +1,27 @@
 import { Request, Response, NextFunction } from "express";
 import { analyzeDocument } from "./analysis.service";
-import { createAnalysis } from "./analysis.repository";
+import { createAnalysis, getDocumentById } from "./analysis.repository";
 import { extractTextFromPDF } from "../../common/utils/pdf";
 
 export const runAnalysis = async (req: any, res: Response, next: NextFunction) => {
     try {
         const { documentId, filePath } = req.body;
 
-        // Extract text again (or store earlier later)
-        const text = await extractTextFromPDF(filePath);
+          const doc = await getDocumentById(documentId);
+
+        if (!doc) {
+            throw new Error("Document not found");
+        }
+
+        let text = "";
+
+        if (doc.filePath) {
+            text = await extractTextFromPDF(doc.filePath);
+        } else if (doc.content) {
+            text = doc.content;
+        } else {
+            throw new Error("No valid content");
+        }
 
         const aiResult = await analyzeDocument(text);
 

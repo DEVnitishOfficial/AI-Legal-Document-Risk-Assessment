@@ -655,3 +655,90 @@ To reduce API cost:
 * Summary, clauses, and risks generated
 * Results stored in database
 ---
+
+
+# ✍️ Direct Text Analysis Support (Enhancement)
+
+---
+
+## 📌 Overview
+
+This enhancement adds support for **analyzing plain text input**, allowing users to paste legal content directly instead of uploading a file.
+
+This is useful for:
+
+* Website Terms & Conditions
+* Privacy Policies
+* Online agreements
+* Any copy-paste legal text
+
+---
+
+## 🔑 Features Added
+
+* Direct text input support
+* New API endpoint for text documents
+* Unified analysis system (PDF + Text)
+* Database support for storing raw content
+
+---
+
+## 🗄️ Database Update
+
+Added new column:
+
+```sql
+ALTER TABLE documents ADD COLUMN content TEXT;
+```
+
+---
+
+## 🌐 API Endpoints
+
+### ➤ Create Text Document
+
+```
+POST /api/v1/documents/text
+```
+
+### Body
+
+```json
+{
+  "content": "Paste your legal text here..."
+}
+```
+
+---
+
+### ➤ Run Analysis
+
+```
+POST /api/v1/analysis/run
+```
+
+```json
+{
+  "documentId": 1
+}
+```
+
+---
+
+## 🔄 Flow
+
+1. User pastes legal text
+2. System stores it in database
+3. Analysis API fetches content
+4. Text sent to AI
+5. Results returned
+
+---
+
+## ✅ Result
+
+* Users can analyze documents without PDFs
+* Supports real-world use cases
+* Improved usability and flexibility
+
+---

@@ -19,3 +19,12 @@ export const createAnalysis = async (
 
     return result.rows[0];
 };
+
+export const getDocumentById = async (documentId: number) => {
+    const query = `
+     SELECT * FROM documents WHERE id = $1;
+  `;
+
+  const result = await pool.query(query, [documentId]);
+  return result.rows[0];
+};

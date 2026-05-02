@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { uploadDoc } from "./document.controller";
+import { createTextDocumentController, uploadDoc } from "./document.controller";
 import { upload } from "../../config/multer";
 import { authMiddleware } from "../../common/middleware/auth.middleware";
 
@@ -11,5 +11,7 @@ router.post(
   upload.single("file"),
   uploadDoc
 );
+
+router.post("/text", authMiddleware, createTextDocumentController);
 
 export default router;
