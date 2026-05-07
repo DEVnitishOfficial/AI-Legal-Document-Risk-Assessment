@@ -1,6 +1,23 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { registerUser } from "../features/auth/authSlice";
+import { useDispatch } from "react-redux";
 
 export default function Register() {
+
+const dispatch = useDispatch<any>();
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: ''
+  })
+
+const handleRegister = () => {
+  console.log("Attempting registration with form data:", form);
+  dispatch(registerUser(form))
+}
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
       <div className="bg-gray-900 p-8 rounded-xl w-[400px]">
@@ -10,21 +27,26 @@ export default function Register() {
           type="text"
           placeholder="Name"
           className="w-full mb-4 p-3 rounded bg-gray-800"
+          onChange={e => setForm({ ...form, name: e.target.value })}
         />
 
         <input
           type="email"
           placeholder="Email"
           className="w-full mb-4 p-3 rounded bg-gray-800"
+          onChange={e => setForm({ ...form, email: e.target.value })}
         />
 
         <input
           type="password"
           placeholder="Password"
           className="w-full mb-4 p-3 rounded bg-gray-800"
+          onChange={e => setForm({ ...form, password: e.target.value })}
         />
 
-        <button className="w-full bg-purple-600 p-3 rounded mb-4">
+        <button 
+        onClick={handleRegister}
+        className="w-full bg-purple-600 p-3 rounded mb-4">
           Register
         </button>
 

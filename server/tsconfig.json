@@ -9,6 +9,7 @@
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
 
     "skipLibCheck": true,
 
@@ -16,10 +17,10 @@
 
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+ "include": ["src/**/*", "src/types/express.d.ts"],
   "exclude": [
     "node_modules",
     "dist",
-    "prisma.config.ts"
+    "prisma.config.ts",
   ]
 }

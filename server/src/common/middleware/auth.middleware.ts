@@ -4,11 +4,11 @@ import { env } from "../../config/env";
 import { AppError } from "../errors/AppError";
 import { User } from "../../types/userType";
 
-interface AuthRequest extends Request {
-  user?: User; 
-}
+// interface AuthRequest extends Request {
+//   user?: User; 
+// }
 
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -20,7 +20,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 
     const decodedToken = jwt.verify(token, env.JWT_SECRET);
 
-    req.user = decodedToken as User;
+    req.user = decodedToken;
     console.log('Auth middleware completed successfully');
     next();
   } catch (err) {

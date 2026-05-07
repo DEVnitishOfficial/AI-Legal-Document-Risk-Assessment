@@ -8,6 +8,7 @@ export const createUser = async (name: string, email: string, password: string) 
   `;
 
   const values = [name, email, password];
+  console.log("Creating user with values:", values);
 
   const result = await pool.query(query, values);
   return result.rows[0];

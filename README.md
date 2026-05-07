@@ -8,3 +8,6 @@ npx prisma studio
 netstat -ano | grep "LISTEN"
 netstat -ano | findstr :3001
 netstat -ano | grep ":3001"
+
+
+halted on : trying to fix the backend, unable to login form google and first try to debug that why there is no log coming when routes hit and i proceed. also first try to login manually or try register first form the frontend part.
