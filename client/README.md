@@ -185,7 +185,7 @@ GET /api/v1/auth/google/callback
 
 ---
 
-## 🔐 Token Handling
+## Token Handling
 
 * JWT generated after login
 * Sent to frontend via redirect URL
@@ -193,7 +193,7 @@ GET /api/v1/auth/google/callback
 
 ---
 
-## ✅ Result
+## Result
 
 * Google login fully working
 * User auto-created if not exists

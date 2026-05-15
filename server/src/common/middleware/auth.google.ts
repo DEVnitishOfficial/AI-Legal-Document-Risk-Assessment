@@ -12,13 +12,13 @@ try {
       {
         clientID: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
-        callbackURL: "http://localhost:3000/api/v1/auth/google/callback",
+        callbackURL: "http://localhost:3000/api/v1/auth/google/callback", // this url consist the code that google sends back after successful login, we will exchange that code for access token and user info
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
           const email = profile.emails?.[0]?.value;
           const name = profile.displayName;
-
+          const profilePicture = profile.photos?.[0]?.value;
           console.log("Google profile:", profile);
 
           if (!email) {
@@ -35,7 +35,7 @@ try {
             user = await userRepo.createUser(
               name,
               email,
-              "GOOGLE_AUTH_USER"
+              "GOOGLE_AUTH_USER",
             );
           }
           console.log("User created or found:", user);

@@ -1,9 +1,16 @@
-import React from 'react'
+import Sidebar from "../components/layout/Sidebar";
+import UploadPanel from "../features/document/UploadPanel";
 
-const Dashboard = () => {
+export default function Dashboard() {
   return (
-    <div>Dashboard</div>
-  )
-}
+    <div className="flex h-screen bg-gray-950 text-white">
+      <Sidebar />
 
-export default Dashboard
+      <div className="flex-1 p-6 overflow-y-auto">
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+
+        <UploadPanel />
+      </div>
+    </div>
+  );
+}
