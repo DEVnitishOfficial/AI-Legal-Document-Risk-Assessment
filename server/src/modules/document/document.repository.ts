@@ -27,3 +27,14 @@ export const createTextDocument = async (
   const result = await pool.query(query, [userId, content]);
   return result.rows[0];
 };
+
+export const getUserDocuments = async (userId: number) => {
+  const query = `
+    SELECT * FROM documents
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+  `;
+
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+};

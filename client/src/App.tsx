@@ -7,12 +7,16 @@ import ProtectedRoute from './routes/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import OAuthSuccess from './pages/OAuthSuccess'
 import { Toaster } from 'react-hot-toast'
+import DocumentList from './pages/DocumentList'
+import { useState } from 'react'
 
 function App () {
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+
   return (
     <BrowserRouter>
       <Toaster
-        position='top-right'
+        position='top-center'
         toastOptions={{
           duration: 4000,
           style: {
@@ -31,6 +35,18 @@ function App () {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/documents'
+          element={
+            <ProtectedRoute>
+              <DocumentList
+                            onSelect={(doc: any) => {
+                              setSelectedDoc(doc);
+                            }}
+                          />
             </ProtectedRoute>
           }
         />

@@ -11,6 +11,7 @@ import { User } from "../../types/userType";
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
+    console.log("Authorization header:", authHeader);
 
     if (!authHeader) {
       throw new AppError("Unauthorized request", 401);
@@ -19,6 +20,8 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     const token = authHeader.split(" ")[1];
 
     const decodedToken = jwt.verify(token, env.JWT_SECRET);
+
+    console.log("Decoded token in auth middleware:", decodedToken);
 
     req.user = decodedToken;
     console.log('Auth middleware completed successfully');

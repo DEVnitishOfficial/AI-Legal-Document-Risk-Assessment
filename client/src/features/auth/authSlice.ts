@@ -6,8 +6,6 @@ export const loginUser = createAsyncThunk(
   "auth/login",
   async (data: { email: string; password: string }) => {
     const res = await API.post("/users/login", data);
-    toast.success("Login successful!");
-    console.log("Login response:", res.data);
     return res.data.data;
   }
 );
@@ -16,8 +14,6 @@ export const registerUser = createAsyncThunk(
   "auth/register",
   async (data: any) => {
     const res = await API.post("/users/register", data);
-    toast.success("Registration successful!");
-    console.log("Registration response:", res.data);
     return res.data.data;
   }
 );
@@ -38,6 +34,7 @@ const authSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(loginUser.fulfilled, (state, action: any) => {
       state.user = action.payload.user;
+      console.log("Login successful, user data:", action.payload.user);
       state.token = action.payload.token;
 
       localStorage.setItem("token", action.payload.token);

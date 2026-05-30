@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { createTextDoc, uploadDocument } from "./document.service";
 import { User } from "../../types/userType";
+import { getUserDocuments } from "./document.repository";
 
 interface AuthRequest extends Request {
   user?: User;
@@ -44,6 +45,21 @@ export const uploadDoc = async (req: Request, res: Response, next: NextFunction)
     res.status(201).json({
       success: true,
       data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getDocuments = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.id;
+
+    const docs = await getUserDocuments(userId);
+
+    res.json({
+      success: true,
+      data: docs,
     });
   } catch (err) {
     next(err);

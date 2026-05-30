@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { registerUser } from "../features/auth/authSlice";
 import { useDispatch } from "react-redux";
+import {useNavigate} from "react-router-dom";
+import { toast } from "react-hot-toast";
 
 export default function Register() {
-
-const dispatch = useDispatch<any>();
+  const navigate = useNavigate();
+  const dispatch = useDispatch<any>();
 
   const [form, setForm] = useState({
     name: '',
@@ -16,6 +18,8 @@ const dispatch = useDispatch<any>();
 const handleRegister = () => {
   console.log("Attempting registration with form data:", form);
   dispatch(registerUser(form))
+  toast.success("Registration successful! Please log in.")
+  navigate('/login')
 }
 
   return (
