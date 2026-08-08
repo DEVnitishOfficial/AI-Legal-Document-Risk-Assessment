@@ -1,40 +1,26 @@
-import { pool } from "../../config/db";
+import { prisma } from "../../config/db";
 
 export const createDocument = async (
   userId: number,
   filePath: string
 ) => {
-  const query = `
-    INSERT INTO documents (user_id, file_path)
-    VALUES ($1, $2)
-    RETURNING *;
-  `;
-
-  const result = await pool.query(query, [userId, filePath]);
-  return result.rows[0];
+  return prisma.document.create({
+    data: { userId, filePath },
+  });
 };
 
 export const createTextDocument = async (
   userId: number,
   content: string
 ) => {
-  const query = `
-    INSERT INTO documents (user_id, content, status)
-    VALUES ($1, $2, 'pending')
-    RETURNING *;
-  `;
-
-  const result = await pool.query(query, [userId, content]);
-  return result.rows[0];
+  return prisma.document.create({
+    data: { userId, content, status: "pending" },
+  });
 };
 
 export const getUserDocuments = async (userId: number) => {
-  const query = `
-    SELECT * FROM documents
-    WHERE user_id = $1
-    ORDER BY created_at DESC
-  `;
-
-  const result = await pool.query(query, [userId]);
-  return result.rows;
+  return prisma.document.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
 };

@@ -1,14 +1,12 @@
-import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../generated/prisma/client";
 import { env } from "./env";
 
-export const pool = new Pool({
-  user: env.DB_USER,
-  host: "localhost",
-  database: env.DB_NAME,
-  password: env.DB_PASSWORD,
-  port: 5432,
-});
+const adapter = new PrismaPg(env.DATABASE_URL);
 
-pool.connect()
+export const prisma = new PrismaClient({ adapter });
+
+prisma
+  .$connect()
   .then(() => console.log("✅ DB Connected"))
   .catch((err) => console.error("❌ DB Error", err));

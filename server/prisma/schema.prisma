@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  name      String
+  email     String     @unique
+  password  String
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  documents Document[]
+
+  @@map("users")
+}
+
+model Document {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  filePath  String?   @map("file_path")
+  content   String?
+  status    String    @default("pending")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis  Analysis?
+
+  @@map("documents")
+}
+
+model Analysis {
+  id         Int      @id @default(autoincrement())
+  documentId Int      @unique @map("document_id")
+  summary    String
+  riskLevel  String   @map("risk_level")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("analyses")
+}

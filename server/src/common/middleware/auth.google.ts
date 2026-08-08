@@ -48,7 +48,7 @@ try {
           console.log("Generated JWT token:", token);
 
           //pass both user + token forward
-          return done(null, { user, token });
+          return done(null, { user, token } as unknown as Express.User);
         } catch (err) {
           return done(err, undefined);
         }

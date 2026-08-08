@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../../config/env";
 import { AppError } from "../errors/AppError";
-import { User } from "../../types/userType";
 
 // interface AuthRequest extends Request {
 //   user?: User; 
@@ -23,7 +22,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
 
     console.log("Decoded token in auth middleware:", decodedToken);
 
-    req.user = decodedToken;
+    req.user = decodedToken as unknown as Express.User;
     console.log('Auth middleware completed successfully');
     next();
   } catch (err) {

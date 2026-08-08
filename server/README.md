@@ -61,6 +61,7 @@ server/src/
 
 * **Backend:** Node.js + Express + TypeScript
 * **Database:** PostgreSQL
+* **ORM:** Prisma (see [Phase 5](#-prisma-orm-migration-phase-5))
 * **Containerization:** Docker
 * **API Testing:** Postman
 
@@ -116,6 +117,8 @@ docker ps
 ---
 
 ## 🗄️ Database Schema
+
+> ⚠️ **Superseded by Prisma ORM** — see [Phase 5](#-prisma-orm-migration-phase-5) below. Tables are no longer created manually; they're generated from `prisma/schema.prisma` via migrations. This section is kept for history.
 
 Tables created manually using SQL: for visualization used DBeaver and created table manually using the Dbeaver tool
 
@@ -740,5 +743,148 @@ POST /api/v1/analysis/run
 * Users can analyze documents without PDFs
 * Supports real-world use cases
 * Improved usability and flexibility
+
+---
+
+# 🧬 Prisma ORM Migration (Phase 5)
+
+---
+
+## 📌 Overview
+
+A full laptop reset wiped the local Postgres data and the manually-created (DBeaver) schema, which also broke login/register since the `users` table no longer existed. Rather than recreating tables by hand again, the database layer was migrated from raw `pg` queries + manual SQL to **Prisma ORM**, so the entire schema is now reproducible from source via migrations.
+
+---
+
+## 🔑 Features Implemented
+
+* Prisma ORM (v7) with **driver adapters** (`@prisma/adapter-pg`)
+* `schema.prisma` defining `User`, `Document`, `Analysis` models, mapped to the existing snake_case columns (`user_id`, `file_path`, `risk_level`, etc.) so no other contract changed
+* `prisma migrate dev` workflow replacing manual SQL / DBeaver table creation
+* Prisma Client singleton in `src/config/db.ts`
+* All three repositories (`user`, `document`, `analysis`) rewritten from raw SQL to Prisma Client calls
+
+---
+
+## ⚠️ Why a driver adapter?
+
+Prisma 7 no longer accepts a `url` directly inside the `datasource` block in `schema.prisma` — that pattern is deprecated in favor of **driver adapters**. `PrismaClient` is now constructed with an adapter that wraps a real `pg.Pool`:
+
+```ts
+// src/config/db.ts
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../generated/prisma/client";
+import { env } from "./env";
+
+const adapter = new PrismaPg(env.DATABASE_URL);
+export const prisma = new PrismaClient({ adapter });
+```
+
+`prisma.config.ts` (project root) separately holds `DATABASE_URL` for the **CLI** (`migrate`, `studio`) — it is not read by the running app.
+
+---
+
+## 📦 Dependencies
+
+```bash
+npm install prisma @prisma/client @prisma/adapter-pg
+```
+
+`pg` stays installed — the adapter uses it under the hood to open the actual connection.
+
+---
+
+## 📁 Key Files
+
+* `prisma/schema.prisma` — schema source of truth
+* `prisma.config.ts` — CLI config (datasource URL for `migrate`/`studio`)
+* `prisma/migrations/` — generated SQL migration history (committed to git)
+* `src/generated/prisma/` — generated Prisma Client (gitignored, regenerated on install)
+* `src/config/db.ts` — Prisma Client singleton
+
+---
+
+## 🧰 New npm Scripts
+
+```bash
+npm run prisma:generate   # regenerate client after schema changes
+npm run prisma:migrate    # create + apply a new migration (dev)
+npm run prisma:deploy     # apply pending migrations (prod / fresh machine)
+npm run prisma:studio     # open Prisma Studio GUI
+```
+
+`postinstall` also runs `prisma generate` automatically after `npm install`.
+
+---
+
+## 🔄 Fresh-Machine Recovery Flow
+
+This is exactly the scenario that motivated the migration — no more manually recreating tables in DBeaver after a reset:
+
+```bash
+docker compose up -d          # start Postgres
+npm install                   # installs deps + auto-generates Prisma Client
+npx prisma migrate deploy     # recreates every table from migration history
+npm run dev                   # server boots, DB connected
+```
+
+---
+
+## 🗄️ Schema (Prisma-managed)
+
+```prisma
+model User {
+  id        Int        @id @default(autoincrement())
+  name      String
+  email     String     @unique
+  password  String
+  createdAt DateTime   @default(now()) @map("created_at")
+  documents Document[]
+
+  @@map("users")
+}
+
+model Document {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  filePath  String?   @map("file_path")
+  content   String?
+  status    String    @default("pending")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis  Analysis?
+
+  @@map("documents")
+}
+
+model Analysis {
+  id         Int      @id @default(autoincrement())
+  documentId Int      @unique @map("document_id")
+  summary    String
+  riskLevel  String   @map("risk_level")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("analyses")
+}
+```
+
+---
+
+## ✅ Result
+
+* Registration, login, and JWT-protected `/me` verified working end-to-end against the Prisma-backed DB
+* Two pre-existing TypeScript errors fixed (JWT payload vs. `Express.User` typing, Google OAuth `done()` callback shape) that were silently blocking `ts-node` from booting at all
+* Schema is now reproducible via `prisma migrate deploy` instead of manual DBeaver SQL
+
+---
+
+## 🚀 Next Steps
+
+* Add a `prisma db seed` script for local dev fixtures
+* Revisit connection pooling (e.g. Prisma Accelerate or pgbouncer) before production deploy
+* Continue wiring future schema changes (new fields, tables) through `prisma migrate dev` instead of manual SQL
 
 ---

@@ -1,22 +1,13 @@
-import { pool } from "../../config/db"
+import { prisma } from "../../config/db";
 
 export const createUser = async (name: string, email: string, password: string) => {
-  const query = `
-    INSERT INTO users (name, email, password)
-    VALUES ($1, $2, $3)
-    RETURNING *;
-  `;
+  console.log("Creating user with values:", { name, email });
 
-  const values = [name, email, password];
-  console.log("Creating user with values:", values);
-
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  return prisma.user.create({
+    data: { name, email, password },
+  });
 };
 
 export const findUserByEmail = async (email: string) => {
-  const query = `SELECT * FROM users WHERE email = $1`;
-
-  const result = await pool.query(query, [email]);
-  return result.rows[0];
+  return prisma.user.findUnique({ where: { email } });
 };
