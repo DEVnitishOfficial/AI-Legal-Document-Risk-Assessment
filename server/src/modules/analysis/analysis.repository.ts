@@ -5,8 +5,13 @@ export const createAnalysis = async (
     summary: string,
     riskLevel: string
 ) => {
-    return prisma.analysis.create({
-        data: { documentId, summary, riskLevel },
+    // A document can only have one analysis (documentId is unique), so
+    // re-running analysis on an already-analyzed document must overwrite
+    // the existing row instead of colliding with the unique constraint.
+    return prisma.analysis.upsert({
+        where: { documentId },
+        update: { summary, riskLevel },
+        create: { documentId, summary, riskLevel },
     });
 };
 

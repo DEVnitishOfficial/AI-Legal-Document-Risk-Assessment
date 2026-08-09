@@ -5,20 +5,35 @@ import API from "../services/api";
 import DocumentList from "./DocumentList";
 import ResultPanel from "./ResultPanel";
 import { useSelector } from "react-redux";
+import toast from "react-hot-toast";
 
 export default function Dashboard() {
-  // const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const user = useSelector((state: any) => state.auth.user);
 
-  // const runAnalysis = async (doc: any) => {
-  //   const res = await API.post("/analysis/run", {
-  //     documentId: doc.id,
-  //   });
+  const runAnalysis = async (documentId: number) => {
+    setSelectedId(documentId);
+    setAnalyzing(true);
+    setResult(null);
 
-  //   setResult(res.data.data);
-  // };
+    try {
+      const res = await API.post("/analysis/run", { documentId });
+      setResult(res.data.data.ai);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleUploaded = (documentId: number) => {
+    setRefreshKey((k) => k + 1);
+    runAnalysis(documentId);
+  };
 
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
 
@@ -46,16 +61,15 @@ export default function Dashboard() {
         {/* 🔹 Main Content */}
         <div className="flex-1 p-6 grid grid-cols-2 gap-6">
           <div>
-            <UploadPanel />
+            <UploadPanel onUploaded={handleUploaded} disabled={analyzing} />
             <DocumentList
-              onSelect={(doc: any) => {
-                setSelectedDoc(doc);
-                // runAnalysis(doc);
-              }}
+              refreshKey={refreshKey}
+              selectedId={selectedId}
+              onSelect={(doc: any) => runAnalysis(doc.id)}
             />
           </div>
 
-          <ResultPanel result={result} />
+          <ResultPanel result={result} analyzing={analyzing} />
         </div>
       </div>
     </div>

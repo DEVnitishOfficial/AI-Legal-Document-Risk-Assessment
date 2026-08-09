@@ -1,27 +1,50 @@
 import { useState } from "react";
 import API from "../../services/api";
+import toast from "react-hot-toast";
 
-export default function UploadPanel() {
+interface UploadPanelProps {
+  onUploaded: (documentId: number) => void;
+  disabled?: boolean;
+}
+
+export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) {
   const [mode, setMode] = useState<"file" | "text">("file");
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleUpload = async () => {
+    if (mode === "file" && !file) {
+      toast.error("Please choose a file first");
+      return;
+    }
+
+    if (mode === "text" && text.trim().length < 50) {
+      toast.error("Please paste at least 50 characters");
+      return;
+    }
+
     setLoading(true);
     try {
-      if (mode === "file" && file) {
-        const formData = new FormData();
-        formData.append("file", file);
+      let documentId: number;
 
-        await API.post("/documents/upload", formData);
-      } else if (mode === "text") {
-        await API.post("/documents/text", { content: text });
+      if (mode === "file") {
+        const formData = new FormData();
+        formData.append("file", file as File);
+
+        const res = await API.post("/documents/upload", formData);
+        documentId = res.data.data.document.id;
+        setFile(null);
+      } else {
+        const res = await API.post("/documents/text", { content: text });
+        documentId = res.data.data.document.id;
+        setText("");
       }
 
-      alert("Uploaded successfully 🚀");
-    } catch (err) {
-      alert("Upload failed ❌");
+      toast.success("Uploaded successfully 🚀");
+      onUploaded(documentId);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Upload failed");
     } finally {
       setLoading(false);
     }
@@ -56,6 +79,7 @@ export default function UploadPanel() {
           <input
             type="file"
             className="mb-4"
+            disabled={loading || disabled}
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
         </div>
@@ -64,8 +88,10 @@ export default function UploadPanel() {
       {/* TEXT MODE */}
       {mode === "text" && (
         <textarea
-          placeholder="Paste your terms and conditions here..."
+          value={text}
+          placeholder="Paste your terms and conditions here... (minimum 50 characters)"
           className="w-full h-40 p-3 rounded bg-gray-800 mb-4"
+          disabled={loading || disabled}
           onChange={(e) => setText(e.target.value)}
         />
       )}
@@ -73,10 +99,10 @@ export default function UploadPanel() {
       {/* ACTION */}
       <button
         onClick={handleUpload}
-        disabled={loading}
-        className="bg-purple-600 px-6 py-2 rounded"
+        disabled={loading || disabled}
+        className="bg-purple-600 px-6 py-2 rounded disabled:opacity-50"
       >
-        {loading ? "Processing..." : "Submit"}
+        {loading ? "Uploading..." : disabled ? "Analyzing..." : "Submit"}
       </button>
     </div>
   );

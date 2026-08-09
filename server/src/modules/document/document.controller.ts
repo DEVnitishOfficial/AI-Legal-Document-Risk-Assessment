@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { createTextDoc, uploadDocument } from "./document.service";
 import { User } from "../../types/userType";
 import { getUserDocuments } from "./document.repository";
+import { AppError } from "../../common/errors/AppError";
 
 interface AuthRequest extends Request {
   user?: User;
@@ -13,13 +14,13 @@ export const uploadDoc = async (req: Request, res: Response, next: NextFunction)
     const authReq = req as AuthRequest;
 
     if(!authReq.user || !authReq?.user?.id) {
-      throw new Error("User not authenticated");
+      throw new AppError("User not authenticated", 401);
     }
 
     const userId: number = authReq.user?.id;
 
     if (!authReq.file) {
-      throw new Error("No file uploaded");
+      throw new AppError("No file uploaded", 400);
     }
 
     const result = await uploadDocument(userId, authReq.file.path);
@@ -37,10 +38,15 @@ export const uploadDoc = async (req: Request, res: Response, next: NextFunction)
   export const createTextDocumentController = async (req: Request, res:Response, next:NextFunction) => {
   try {
     const authReq = req as AuthRequest;
-    const userId = authReq?.user?.id;
+
+    if (!authReq.user || !authReq.user.id) {
+      throw new AppError("User not authenticated", 401);
+    }
+
+    const userId: number = authReq.user.id;
     const { content } = req.body;
 
-    const result = await createTextDoc(userId!, content);
+    const result = await createTextDoc(userId, content);
 
     res.status(201).json({
       success: true,

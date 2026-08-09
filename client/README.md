@@ -201,3 +201,33 @@ GET /api/v1/auth/google/callback
 
 ---
 
+# 📄 Document Upload, Paste-Text & Analysis Result Wiring (Phase 3)
+
+---
+
+## 📌 Overview
+
+The Dashboard's upload → AI analysis → result-display pipeline was effectively dead: `Dashboard.tsx` had the call to `POST /analysis/run` commented out, and the document-click handler referenced a `setSelectedDoc` function whose declaration was also commented out (a `ReferenceError` waiting to happen). So documents could be uploaded, but the AI summary/risk result was never fetched or shown, and pasting text under the backend's 50-character minimum surfaced as an opaque `alert("Upload failed ❌")` with no real detail.
+
+---
+
+## 🔑 Fixes
+
+* **`Dashboard.tsx`** — rebuilt the wiring: `runAnalysis(documentId)` now actually calls `POST /analysis/run` and sets the result; `handleUploaded(documentId)` (passed to `UploadPanel`) refreshes the document list and immediately runs analysis on the new document. Fixed the dangling `setSelectedDoc` reference.
+* **`UploadPanel.tsx`** — now reports the real backend error message via `react-hot-toast` (`err.response.data.message`) instead of a generic `alert()`; client-side guards prevent submitting an empty file / under-50-char text before hitting the API; disables itself while an analysis is in flight so a second upload can't be started mid-analysis.
+* **`ResultPanel.tsx`** — added an `analyzing` loading state ("Analyzing document with AI…") so there's visible feedback while the OpenAI call is in flight, instead of the panel just sitting blank.
+* **`DocumentList.tsx`** — was still reading `doc.file_path` / `doc.created_at` (snake_case) from a raw-SQL-era API response; the backend now returns Prisma's camelCase (`filePath` / `createdAt`) after the ORM migration (see `server/README.md` Phase 5), so this was silently broken. Fixed field names, and added a `refreshKey` prop so the list refetches after a new upload instead of only on mount.
+
+---
+
+## ✅ Result
+
+Verified in a real headless-browser session (Playwright, driven end-to-end — login, paste text, wait for the loading state, wait for the populated result, click an existing document to re-trigger analysis):
+
+* Pasting a sample legal clause renders a real AI-generated Summary, Risk Level badge (Low/Medium/High), Important Clauses list, and Risk Insights list
+* The "Analyzing document with AI…" loading state shows correctly between submit and result
+* Clicking a previously-analyzed document in "Your Documents" re-runs and re-displays its analysis
+* Zero console errors across the full flow
+
+---
+
