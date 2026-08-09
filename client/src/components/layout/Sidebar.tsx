@@ -10,6 +10,7 @@ import { logout } from "../../features/auth/authSlice";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
+import ThemeToggle from "../ThemeToggle";
 
 export default function Sidebar() {
   const dispatch = useDispatch();
@@ -50,7 +51,7 @@ export default function Sidebar() {
       {/* 🔹 Mobile Hamburger */}
       <button
         onClick={() => setIsOpen(true)}
-        className="md:hidden p-2 m-3 rounded-lg bg-gray-900 text-white fixed top-0 left-0 z-50"
+        className="md:hidden p-2 m-3 rounded-lg bg-white text-gray-900 dark:bg-gray-900 dark:text-white fixed top-0 left-0 z-50 border border-gray-200 dark:border-transparent"
       >
         <Menu size={22} />
       </button>
@@ -66,7 +67,7 @@ export default function Sidebar() {
       {/* 🔹 Sidebar */}
       <div
         className={`
-        fixed md:static top-0 left-0 h-full w-64 bg-gray-900 p-5 flex flex-col justify-between z-50
+        fixed md:static top-0 left-0 h-full w-64 bg-white text-gray-900 border-r border-gray-200 dark:bg-gray-900 dark:text-white dark:border-transparent p-5 flex flex-col justify-between z-50
         transform transition-transform duration-300
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
         md:translate-x-0
@@ -76,15 +77,19 @@ export default function Sidebar() {
         <div>
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
-            <h1 className="text-xl font-bold text-white">LegalAI</h1>
+            <h1 className="text-xl font-bold">LegalAI</h1>
 
-            {/* Close (mobile only) */}
-            <button
-              onClick={() => setIsOpen(false)}
-              className="md:hidden"
-            >
-              <X className="text-white cursor-pointer" />
-            </button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+
+              {/* Close (mobile only) */}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="md:hidden"
+              >
+                <X className="cursor-pointer" />
+              </button>
+            </div>
           </div>
 
           {/* Nav */}
@@ -100,8 +105,8 @@ export default function Sidebar() {
                     flex items-center gap-3 p-2 rounded-lg cursor-pointer transition
                     ${
                       isActive
-                        ? "bg-gray-800 text-white"
-                        : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                        ? "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
+                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                     }
                   `}
                 >
@@ -116,7 +121,7 @@ export default function Sidebar() {
         {/* 🔹 Bottom */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-red-400 hover:text-red-600 transition"
+          className="flex items-center gap-2 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-600 transition"
         >
           <LogOut size={18} /> Logout
         </button>

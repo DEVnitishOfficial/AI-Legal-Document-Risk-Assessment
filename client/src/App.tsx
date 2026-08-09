@@ -7,11 +7,23 @@ import ProtectedRoute from './routes/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import OAuthSuccess from './pages/OAuthSuccess'
 import { Toaster } from 'react-hot-toast'
-import DocumentList from './pages/DocumentList'
-import { useState } from 'react'
+import DocumentsPage from './pages/DocumentsPage'
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { fetchCurrentUser } from './features/auth/authSlice'
+import { useTheme } from './app/ThemeProvider'
 
 function App () {
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const dispatch = useDispatch<any>()
+  const user = useSelector((state: any) => state.auth.user)
+  const { theme } = useTheme()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token && !user) {
+      dispatch(fetchCurrentUser())
+    }
+  }, [])
 
   return (
     <BrowserRouter>
@@ -19,10 +31,9 @@ function App () {
         position='top-center'
         toastOptions={{
           duration: 4000,
-          style: {
-            background: '#333',
-            color: '#fff'
-          }
+          style: theme === 'dark'
+            ? { background: '#333', color: '#fff' }
+            : { background: '#fff', color: '#111', border: '1px solid #e5e7eb' }
         }}
       />
       <Routes>
@@ -42,11 +53,7 @@ function App () {
           path='/documents'
           element={
             <ProtectedRoute>
-              <DocumentList
-                            onSelect={(doc: any) => {
-                              setSelectedDoc(doc);
-                            }}
-                          />
+              <DocumentsPage />
             </ProtectedRoute>
           }
         />

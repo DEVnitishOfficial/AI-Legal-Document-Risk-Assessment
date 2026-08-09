@@ -18,6 +18,14 @@ export const registerUser = createAsyncThunk(
   }
 );
 
+export const fetchCurrentUser = createAsyncThunk(
+  "auth/fetchCurrentUser",
+  async () => {
+    const res = await API.get("/users/me");
+    return res.data.user;
+  }
+);
+
 const authSlice = createSlice({
   name: "auth",
   initialState: {
@@ -38,6 +46,9 @@ const authSlice = createSlice({
       state.token = action.payload.token;
 
       localStorage.setItem("token", action.payload.token);
+    });
+    builder.addCase(fetchCurrentUser.fulfilled, (state, action: any) => {
+      state.user = action.payload;
     });
   },
 });

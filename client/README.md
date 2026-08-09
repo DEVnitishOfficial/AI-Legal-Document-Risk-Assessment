@@ -220,14 +220,59 @@ The Dashboard's upload → AI analysis → result-display pipeline was effective
 
 ---
 
+# 👤 Real User Display, Documents Page & Light/Dark Theme (Phase 4)
+
+---
+
+## 📌 Overview
+
+Three gaps closed in this pass: the sidebar always showed "User" instead of the logged-in name, the sidebar's "Documents" nav link led to a page where clicking a document did nothing visible, and the app was dark-mode-only with no way to switch.
+
+---
+
+## 🔑 Fixes & Features
+
+### Real user name/initial
+
+`state.auth.user` in Redux was only ever set by the `loginUser` thunk — Google OAuth (`OAuthSuccess.tsx`) stored just the token and never fetched the profile, and a page refresh reset Redux state entirely (only `token` survives in localStorage). Fixed:
+
+* `authSlice.ts` — new `fetchCurrentUser` thunk (`GET /users/me`, now returns the real user — see `server/README.md` Phase 7) with an `extraReducers` case setting `state.user`.
+* `OAuthSuccess.tsx` — dispatches `fetchCurrentUser()` right after storing the token, before navigating to `/dashboard`.
+* `App.tsx` — mount-time bootstrap effect: if a token exists in localStorage but `state.auth.user` is null, dispatch `fetchCurrentUser()`. Covers page refresh for both login methods.
+
+### Documents page gets a real result view
+
+`/documents` previously rendered a bare `DocumentList` whose `onSelect` just set an unused local state — clicking a document did nothing. The list/result/analyze logic from `Dashboard.tsx` was extracted into a shared hook so both pages work identically:
+
+* New `features/document/useDocumentAnalysis.ts` — `selectedId`, `analysis`, `analyzing`, `refreshKey`, `runAnalysis()`, `handleUploaded()`. Also bumps `refreshKey` after a **fresh** (non-cached) analysis completes, so the sidebar list picks up the AI-generated title/type/status without a manual reload — a fresh analysis run updates the parent document's metadata mid-session.
+* New `pages/DocumentsPage.tsx` — `DocumentList` + `ResultPanel` side by side, same hook. No upload panel here; Dashboard stays "upload & analyze," this page is "browse & review."
+* `App.tsx` — `/documents` now routes to `DocumentsPage`; removed the dead `selectedDoc` state.
+* `DocumentList.tsx` — shows the AI-generated `doc.title`/`doc.documentType` (falling back to filename/"Text Document" when not yet analyzed) and a status dot (pending=gray/completed=green/failed=red).
+* `ResultPanel.tsx` — renders the new structured `riskItems` (severity + category badges per risky clause, from `server/README.md` Phase 7) instead of a flat bullet list, plus a 0–100 `riskScore` bar under the risk-level badge.
+
+### Light/dark theme
+
+The app (Tailwind v4, CSS-first config, no `tailwind.config.js`) had zero theme infrastructure and ~56 hardcoded dark-only color classes across 9 files. Added:
+
+* `App.css` — `@custom-variant dark (&:where(.dark, .dark *));` (Tailwind v4's manual dark-mode toggle; this must live in the same file as `@import "tailwindcss"`, not in the otherwise-empty `index.css`).
+* New `app/ThemeProvider.tsx` — context managing `theme: 'light' | 'dark'`, initialized from `localStorage.getItem('theme')` falling back to `matchMedia('(prefers-color-scheme: dark)')`, toggles the `dark` class on `<html>`, persists on change.
+* New `components/ThemeToggle.tsx` — sun/moon button (`lucide-react`), wired into `main.tsx` (`<ThemeProvider>` wraps `<App/>`).
+* Placement: inside `Sidebar.tsx` for authenticated pages; a small fixed top-right toggle on `Home.tsx`, `Login.tsx`, `Register.tsx` for pre-login pages.
+* Mechanical pass across `Home`, `Login`, `Register`, `Dashboard`, `DocumentsPage`, `Sidebar`, `DocumentList`, `ResultPanel`, `UploadPanel`, `OAuthSuccess`: every hardcoded dark class got a light default with the original prefixed `dark:` (e.g. `bg-gray-950 text-white` → `bg-white text-gray-900 dark:bg-gray-950 dark:text-white`). Purple accent and risk-level badge colors stay fixed across both themes. `App.tsx`'s `<Toaster>` styling is now computed from `useTheme()` since `react-hot-toast`'s inline style option isn't reactive to CSS classes.
+
+---
+
 ## ✅ Result
 
-Verified in a real headless-browser session (Playwright, driven end-to-end — login, paste text, wait for the loading state, wait for the populated result, click an existing document to re-trigger analysis):
+Verified in a real headless-browser session (login persisted across refresh, paste-text → analyze → click into `/documents` → same report, theme toggle on every page):
 
-* Pasting a sample legal clause renders a real AI-generated Summary, Risk Level badge (Low/Medium/High), Important Clauses list, and Risk Insights list
-* The "Analyzing document with AI…" loading state shows correctly between submit and result
-* Clicking a previously-analyzed document in "Your Documents" re-runs and re-displays its analysis
+* Real name and avatar initial shown immediately after both login methods, and survives a hard refresh
+* Clicking a document on `/documents` shows the identical AI analysis report as Dashboard
+* Structured risk cards (severity + category chips) and the risk-score bar render correctly
+* Theme toggles correctly on Home, Login, Register, Dashboard, and Documents, with no invisible-text or unstyled regions in either mode, and the choice survives a page refresh
 * Zero console errors across the full flow
 
 ---
+
+
 

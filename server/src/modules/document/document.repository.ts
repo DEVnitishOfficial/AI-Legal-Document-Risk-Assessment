@@ -24,3 +24,21 @@ export const getUserDocuments = async (userId: number) => {
     orderBy: { createdAt: "desc" },
   });
 };
+
+export const markDocumentAnalyzed = async (
+  documentId: number,
+  title: string | null,
+  documentType: string
+) => {
+  return prisma.document.update({
+    where: { id: documentId },
+    data: { status: "completed", title, documentType },
+  });
+};
+
+export const markDocumentFailed = async (documentId: number) => {
+  return prisma.document.update({
+    where: { id: documentId },
+    data: { status: "failed" },
+  });
+};
