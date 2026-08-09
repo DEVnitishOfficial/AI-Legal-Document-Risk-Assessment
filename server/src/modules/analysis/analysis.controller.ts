@@ -1,16 +1,25 @@
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import { analyzeDocument } from "./analysis.service";
 import { createAnalysis, getDocumentById } from "./analysis.repository";
 import { extractTextFromPDF } from "../../common/utils/pdf";
+import { AppError } from "../../common/errors/AppError";
 
 export const runAnalysis = async (req: any, res: Response, next: NextFunction) => {
     try {
-        const { documentId, filePath } = req.body;
+        const { documentId } = req.body;
 
-          const doc = await getDocumentById(documentId);
+        if (!documentId) {
+            throw new AppError("documentId is required", 400);
+        }
+
+        const doc = await getDocumentById(documentId);
 
         if (!doc) {
-            throw new Error("Document not found");
+            throw new AppError("Document not found", 404);
+        }
+
+        if (doc.userId !== req.user?.id) {
+            throw new AppError("Not authorized to access this document", 403);
         }
 
         let text = "";
@@ -20,7 +29,7 @@ export const runAnalysis = async (req: any, res: Response, next: NextFunction) =
         } else if (doc.content) {
             text = doc.content;
         } else {
-            throw new Error("No valid content");
+            throw new AppError("No valid content found in this document", 400);
         }
 
         const aiResult = await analyzeDocument(text);

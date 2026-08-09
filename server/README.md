@@ -888,3 +888,35 @@ model Analysis {
 * Continue wiring future schema changes (new fields, tables) through `prisma migrate dev` instead of manual SQL
 
 ---
+
+# 🐛 Analysis Pipeline Bug Fixes (Phase 6)
+
+---
+
+## 📌 Overview
+
+After the Prisma migration, the frontend's paste-text upload was returning a generic **500 Internal Server Error**, and clicking a document to view/re-view its analysis also failed. Root cause: several validation failures were thrown as plain `Error` objects instead of `AppError`, so `error.middleware.ts`'s `instanceof AppError` check always fell through to the opaque 500 fallback — masking what were actually simple 400/401/404 cases. There was also a real data-layer bug and a security gap found while fixing this.
+
+---
+
+## 🔑 Fixes
+
+* **`document.service.ts` / `document.controller.ts`** — "text too short", "user not authenticated", and "no file uploaded" now throw `AppError` with the correct status code (400/401) instead of a generic `Error`, so the client gets a real message instead of "Internal Server Error".
+* **`analysis.controller.ts`** — "document not found" and "no valid content" now throw `AppError` (404/400). Also validates `documentId` is present in the request body (400 if missing).
+* **🔒 IDOR fix:** `runAnalysis` had no ownership check — any authenticated user could pass an arbitrary `documentId` and read back **any other user's** analyzed document. Added `if (doc.userId !== req.user?.id) throw new AppError(..., 403)`.
+* **Re-analysis bug:** `Analysis.documentId` is `@unique` in the schema (one analysis per document), but `createAnalysis` always called `prisma.analysis.create()`. Re-running analysis on an already-analyzed document (e.g. clicking it again in the UI) threw a Prisma unique-constraint violation, surfaced as a 500. Fixed by switching to `prisma.analysis.upsert()` in `analysis.repository.ts`.
+* **`error.middleware.ts`** now `console.error`s any non-`AppError` before returning the generic 500, so unexpected failures are actually visible in server logs going forward instead of silently swallowed.
+
+---
+
+## ✅ Result
+
+Verified end-to-end (both via `curl` and a real browser session):
+
+* Paste-text upload → 400 with a real message for text under 50 chars; successful create + analysis for valid text
+* PDF file upload → text extraction → analysis, verified with a sample PDF
+* Re-running analysis on the same document (clicking it again in the doc list) → 200, updates the existing analysis row instead of erroring
+* Cross-user document access → 403, confirmed with a second test account
+* No console errors in the browser during the full paste → analyze → result-display flow
+
+---

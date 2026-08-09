@@ -1,5 +1,6 @@
 import * as docRepo from "./document.repository";
 import { extractTextFromPDF } from "../../common/utils/pdf";
+import { AppError } from "../../common/errors/AppError";
 
 export const uploadDocument = async (userId: number, filePath: string) => {
   // Save document in DB
@@ -15,8 +16,11 @@ export const uploadDocument = async (userId: number, filePath: string) => {
 };
 
 export const createTextDoc = async (userId: number, content: string) => {
-  if (!content || content.length < 50) {
-    throw new Error("Text too short");
+  if (!content || content.trim().length < 50) {
+    throw new AppError(
+      "Pasted text is too short. Please paste at least 50 characters.",
+      400
+    );
   }
 
   const document = await docRepo.createTextDocument(userId, content);

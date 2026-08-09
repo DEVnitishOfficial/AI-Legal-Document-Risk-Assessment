@@ -1,4 +1,12 @@
-export default function ResultPanel({ result }: any) {
+export default function ResultPanel({ result, analyzing }: any) {
+  if (analyzing) {
+    return (
+      <div className="bg-gray-900 p-6 rounded-xl flex items-center justify-center min-h-[200px]">
+        <p className="text-gray-400 animate-pulse">Analyzing document with AI…</p>
+      </div>
+    );
+  }
+
   if (!result) {
     return (
       <div className="bg-gray-900 p-6 rounded-xl">
