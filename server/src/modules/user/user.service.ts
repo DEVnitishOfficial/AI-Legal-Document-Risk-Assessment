@@ -38,3 +38,14 @@ export const loginUser = async (email: string, password: string) => {
     token,
   };
 };
+
+export const getCurrentUser = async (id: number) => {
+  const user = await userRepo.findUserById(id);
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  const { password, ...safeUser } = user;
+  return safeUser;
+};

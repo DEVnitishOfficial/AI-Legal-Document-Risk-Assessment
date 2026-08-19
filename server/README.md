@@ -920,3 +920,37 @@ Verified end-to-end (both via `curl` and a real browser session):
 * No console errors in the browser during the full paste → analyze → result-display flow
 
 ---
+
+# 🧠 Real User Profile, Analysis Caching & Structured Data (Phase 7)
+
+---
+
+## 📌 Overview
+
+Two product gaps surfaced from real usage: the logged-in name always showed "User" (the `/me` endpoint only echoed the JWT payload, which never carried a name), and every click on an already-analyzed document silently re-ran the full OpenAI pipeline — burning tokens for identical output. This phase fixes both, and upgrades what gets stored per analysis so the data is actually useful to a real user (not just a summary + one-word risk level).
+
+---
+
+## 🔑 Fixes & Features
+
+* **`GET /api/v1/users/me`** now fetches the real user row from the DB (`user.repository.ts::findUserById`, `user.service.ts::getCurrentUser`) instead of echoing the decoded JWT — returns `{ id, name, email, createdAt }` with the password stripped.
+* **Analysis caching**: `getDocumentById` (`analysis.repository.ts`) now `include`s the related `Analysis`. `runAnalysis` (`analysis.controller.ts`) checks for an existing analysis first and returns it directly (`cached: true`) — OpenAI is only called on a genuine first run. Verified: repeat calls drop from ~7s to ~0.1s, same analysis row returned.
+* **Document status tracking**: `documents.status` (previously stuck on `"pending"` forever) now transitions to `"completed"` after a successful analysis or `"failed"` on an AI error, via new `document.repository.ts::markDocumentAnalyzed` / `markDocumentFailed`.
+* **Structured, richer analysis data** — schema additions (`prisma/schema.prisma`, migration `add_document_classification_and_structured_risk_items`):
+  * `Document.title` / `Document.documentType` — AI-generated title and a classified category (Rental Agreement / Employment Contract / NDA / Loan Agreement / Privacy Policy / Terms of Service / Business Contract / Other).
+  * `Analysis.clauses` (`String[]`) — the "Important Clauses" list, previously returned by the AI and silently dropped.
+  * `Analysis.riskItems` (`Json`) — each risky clause as a structured object: `{ clause, severity, category, explanation }`, instead of a flat text list.
+  * `Analysis.riskScore` (`Int`) — a 0–100 score derived **server-side, deterministically** from `riskLevel` (Low=30/Medium=60/High=90) — no extra AI call/cost.
+* **`analysis.service.ts`** prompt extended to request `title`, `documentType`, and structured `riskItems` in one OpenAI call (no added latency/cost vs. before), with response normalization/validation so a malformed or drifted AI response can't crash the DB write or the UI.
+* **API shape simplified**: `POST /analysis/run` now returns `{ analysis, cached }` — the `Analysis` row itself carries everything (summary, riskLevel, riskScore, clauses, riskItems), so the previously-duplicated `ai` object in the response was dropped.
+
+---
+
+## ✅ Result
+
+* `/me` returns the real name; verified it now persists across page refresh and both login methods (Phase 4 in `client/README.md`)
+* Second+ analysis run on the same document: `cached: true`, ~0.1s response, identical analysis `id` — confirmed via `curl` timing
+* A real test document (rental agreement) came back `riskLevel: "High"`, `riskScore: 90`, 3 structured `riskItems` each with severity/category/explanation, and `documentType: "Rental Agreement"` with an AI-generated title
+* Document list now shows the real title/type instead of "Text Document" as soon as analysis completes, without a manual page reload
+
+---

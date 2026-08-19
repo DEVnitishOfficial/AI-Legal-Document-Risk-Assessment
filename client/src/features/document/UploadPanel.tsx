@@ -51,13 +51,15 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
   };
 
   return (
-    <div className="bg-gray-900 p-6 rounded-xl">
+    <div className="bg-white border border-gray-200 dark:bg-gray-900 dark:border-transparent p-6 rounded-xl text-gray-900 dark:text-white">
       {/* Tabs */}
       <div className="flex gap-4 mb-6">
         <button
           onClick={() => setMode("file")}
           className={`px-4 py-2 rounded ${
-            mode === "file" ? "bg-purple-600" : "bg-gray-800"
+            mode === "file"
+              ? "bg-purple-600 text-white"
+              : "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
           }`}
         >
           Upload File
@@ -66,7 +68,9 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
         <button
           onClick={() => setMode("text")}
           className={`px-4 py-2 rounded ${
-            mode === "text" ? "bg-purple-600" : "bg-gray-800"
+            mode === "text"
+              ? "bg-purple-600 text-white"
+              : "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
           }`}
         >
           Paste Text
@@ -90,7 +94,7 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
         <textarea
           value={text}
           placeholder="Paste your terms and conditions here... (minimum 50 characters)"
-          className="w-full h-40 p-3 rounded bg-gray-800 mb-4"
+          className="w-full h-40 p-3 rounded bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white mb-4"
           disabled={loading || disabled}
           onChange={(e) => setText(e.target.value)}
         />

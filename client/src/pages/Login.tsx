@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion' // Added for smooth animations
 import { toast } from 'react-hot-toast'
+import ThemeToggle from '../components/ThemeToggle'
 
 export default function Login () {
   const dispatch = useDispatch<any>()
@@ -48,14 +49,16 @@ const handleLogin = async () => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease: 'easeInOut' }}
-      className='min-h-screen flex items-center justify-center bg-gray-950 text-white'
+      className='min-h-screen flex items-center justify-center bg-white text-gray-900 dark:bg-gray-950 dark:text-white'
     >
+      <ThemeToggle className='fixed top-4 right-4' />
+
       {/* Smooth scaling and fade for the card */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.5, ease: 'easeOut' }}
-        className='bg-gray-900 p-8 rounded-xl w-[400px] border border-gray-800 shadow-2xl'
+        className='bg-gray-50 dark:bg-gray-900 p-8 rounded-xl w-[400px] border border-gray-200 dark:border-gray-800 shadow-2xl'
       >
         <h2 className='text-2xl font-bold mb-6'>Login</h2>
         {/* Dynamic Error Message Box */}
@@ -65,7 +68,7 @@ const handleLogin = async () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className='text-sm text-red-400 bg-red-950/50 border border-red-800/50 p-3 rounded mb-4 overflow-hidden'
+              className='text-sm text-red-600 bg-red-100 border border-red-300 dark:text-red-400 dark:bg-red-950/50 dark:border-red-800/50 p-3 rounded mb-4 overflow-hidden'
             >
               {error}
             </motion.div>
@@ -75,14 +78,14 @@ const handleLogin = async () => {
           type='email'
           disabled={isLoading}
           placeholder='Email'
-          className='w-full mb-4 p-3 rounded bg-gray-800 border border-transparent focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-50'
+          className='w-full mb-4 p-3 rounded bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white border border-transparent focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-50'
           onChange={e => setForm({ ...form, email: e.target.value })}
         />
         <input
           type='password'
           disabled={isLoading}
           placeholder='Password'
-          className='w-full mb-4 p-3 rounded bg-gray-800 border border-transparent focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-50'
+          className='w-full mb-4 p-3 rounded bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white border border-transparent focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-50'
           onChange={e => setForm({ ...form, password: e.target.value })}
         />
         {/* Animated Login Button with Loading Spinner */}
@@ -126,13 +129,13 @@ const handleLogin = async () => {
             Register
           </span>
         </p>
-        <div className='text-center text-gray-400 mb-4 text-sm'>OR</div>
+        <div className='text-center text-gray-500 dark:text-gray-400 mb-4 text-sm'>OR</div>
         <button
           onClick={() =>
             (window.location.href = 'http://localhost:3000/api/v1/auth/google')
           }
           disabled={isLoading}
-          className='w-full bg-white hover:bg-gray-100 text-black p-3 rounded font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2'
+          className='w-full bg-white hover:bg-gray-100 text-black p-3 rounded font-semibold border border-gray-300 dark:border-transparent transition-colors disabled:opacity-50 flex items-center justify-center gap-2'
         >
           Continue with Google
         </button>

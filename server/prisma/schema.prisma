@@ -20,12 +20,14 @@ model User {
 }
 
 model Document {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @map("user_id")
-  filePath  String?   @map("file_path")
-  content   String?
-  status    String    @default("pending")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  filePath     String?   @map("file_path")
+  content      String?
+  status       String    @default("pending")
+  title        String?
+  documentType String?   @map("document_type")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   analysis  Analysis?
@@ -38,6 +40,9 @@ model Analysis {
   documentId Int      @unique @map("document_id")
   summary    String
   riskLevel  String   @map("risk_level")
+  riskScore  Int?      @map("risk_score")
+  clauses    String[]  @default([])
+  riskItems  Json      @default("[]") @map("risk_items")
   createdAt  DateTime @default(now()) @map("created_at")
 
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)

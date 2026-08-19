@@ -2,6 +2,19 @@ import { Request, Response, NextFunction } from "express";
 import * as userService from "./user.service";
 import { loginUser } from "./user.service";
 
+export const getMe = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const user = await userService.getCurrentUser(req.user.id);
+
+    res.json({
+      success: true,
+      user,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const register = async (
   req: Request,
   res: Response,
