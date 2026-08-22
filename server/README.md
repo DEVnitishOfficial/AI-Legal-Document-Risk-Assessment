@@ -954,3 +954,43 @@ Two product gaps surfaced from real usage: the logged-in name always showed "Use
 * Document list now shows the real title/type instead of "Text Document" as soon as analysis completes, without a manual page reload
 
 ---
+
+# ⚖️ Legal Assistant Chat Agent + RAG Foundation (Phase 8)
+
+---
+
+## 📌 Overview
+
+New second feature alongside document analysis: an interactive Indian-law "specialist" chat agent — clarifying-question UX, English/Hindi, document-aware, backed by a Firecrawl-fed RAG pipeline for recent case law. This phase is backend-only (Phase 1 of a 4-phase plan: backend → chat UI → voice → polish); no frontend yet.
+
+---
+
+## 🔑 What was built
+
+* **New Prisma models** (migration `add_legal_agent_and_rag`): `Conversation`, `Message` (role/content/kind, with `clarifyOptions`/`citations`/`audioUrl` for future phases), `ConversationDocument` (links an existing `Document` into a conversation for context), `LegalKnowledgeChunk` — the RAG store, with an `embedding` column typed `Unsupported("vector(1536)")` since Prisma has no native vector type.
+* **pgvector infra**: `docker-compose.yml`'s Postgres image switched from `postgres:17-alpine` to `pgvector/pgvector:pg17` (same Postgres 17, adds the extension). Migration manually augmented with `CREATE EXTENSION IF NOT EXISTS vector;` before the table create, plus an `hnsw (embedding vector_cosine_ops)` index for fast cosine-similarity search. All reads/writes to `embedding` go through `prisma.$executeRaw`/`$queryRaw` (`rag.repository.ts`) since Prisma Client can't type-check an `Unsupported` column — verified end-to-end with a manual embed→store→retrieve round trip (cosine distance ranked correctly).
+* **`modules/rag/`** — `rag.service.ts` (`embedText` via OpenAI `text-embedding-3-small`, `retrieveRelevantChunks` via cosine-distance search), `rag.chunk.ts` (paragraph-aware chunking, ~2800 chars with overlap), `rag.ingest.ts` (Firecrawl `scrape()` → chunk → embed → upsert, deduped by a `content_hash` unique constraint so re-crawling unchanged pages is a no-op), `rag.controller.ts`/`rag.routes.ts` (`POST /rag/ingest`, `GET /rag/status`). No admin/role system exists yet, so ingestion is gated by a shared-secret header (`x-ingest-secret` against `env.RAG_INGEST_SECRET`) rather than building full RBAC for one endpoint.
+* **`modules/legal-agent/`** — `legal-agent.prompt.ts` bakes in a static IPC↔BNS/CrPC↔BNSS offence-mapping table and the anticipatory-bail procedure directly into the system prompt (India's 2024 criminal-law recodification means models often blend old/new section numbers — this pins the common ones as ground truth rather than trusting parametric memory or RAG freshness alone). `legal-agent.service.ts::decideNextStep` follows the exact `analysis.service.ts` convention (`response_format: json_object`, allowlist-validate the parsed shape, never trust raw model output) and returns either `{ type: "clarify", question, options }` or `{ type: "answer", content, citations }`. The disclaimer ("not legal advice, consult a licensed advocate") is appended **server-side unconditionally** to every answer, not left to model discretion — same defense-in-depth approach as the deterministic `riskScore`.
+* **Document-aware chat**: `sendMessageHandler` pulls any `ConversationDocument`-linked documents, extracts their text (reusing `extractTextFromPDF`), and injects it into the prompt as primary context — the agent is instructed to ask about gaps the document doesn't cover rather than generic questions it already answers.
+* **New env vars**: `FIRECRAWL_API_KEY`, `RAG_INGEST_SECRET` (both placeholders in `.env` — need real values before ingestion/production use).
+* **New dependency**: `@mendable/firecrawl-js`.
+
+---
+
+## ✅ Result (verified via `curl` against a running dev server + a throwaway test user, both cleaned up after)
+
+* `POST /legal-agent/conversations` → `POST /legal-agent/conversations/:id/messages` round trip works for both response types:
+  * Ambiguous prompt ("I want to file a case against someone") → `type: "clarify"` with 4 well-formed, relevant options.
+  * Specific prompt ("someone hacked my bank account") → `type: "answer"` with concrete IT Act-referenced steps and the disclaimer appended.
+  * The exact "false case from a jealous relative, scared of arrest" scenario → correctly walks through the seeded anticipatory-bail procedure (Sessions/High Court application, interim protection, conditions, malicious-prosecution follow-up).
+* `GET /legal-agent/conversations` and `GET /legal-agent/conversations/:id` return the list/detail correctly, with an auto-generated title (first 60 chars of the first message — no extra AI call, kept cheap).
+* pgvector round trip (`embedAndStoreChunk` → `retrieveRelevantChunks`) verified directly: a stored chunk about anticipatory bail was correctly retrieved (lowest cosine distance) for a semantically related query.
+* **Not yet verified**: real Firecrawl ingestion against Indian Kanoon — `FIRECRAWL_API_KEY` is still a placeholder in `.env`; needs a real key before `POST /rag/ingest` can be run for real.
+
+---
+
+## ⏭️ Next (Phases 2–4, not built yet)
+
+Chat UI (new page, conversation list, clarify-chip rendering, EN/HI toggle, document attach), voice (OpenAI Whisper STT + TTS), then polish (streaming responses, citations UI, scheduled ingestion). See the approved plan for full detail.
+
+---

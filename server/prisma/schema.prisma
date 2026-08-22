@@ -14,7 +14,8 @@ model User {
   password  String
   createdAt DateTime   @default(now()) @map("created_at")
 
-  documents Document[]
+  documents     Document[]
+  conversations Conversation[]
 
   @@map("users")
 }
@@ -29,8 +30,9 @@ model Document {
   documentType String?   @map("document_type")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  analysis  Analysis?
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis              Analysis?
+  conversationDocuments ConversationDocument[]
 
   @@map("documents")
 }
@@ -48,4 +50,63 @@ model Analysis {
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@map("analyses")
+}
+
+model Conversation {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String?
+  language  String   @default("en")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  documents ConversationDocument[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  conversationId Int      @map("conversation_id")
+  role           String
+  content        String
+  kind           String   @default("text")
+  clarifyOptions Json?    @map("clarify_options")
+  citations      Json?
+  audioUrl       String?  @map("audio_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model ConversationDocument {
+  id             Int      @id @default(autoincrement())
+  conversationId Int      @map("conversation_id")
+  documentId     Int      @map("document_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  document     Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, documentId])
+  @@map("conversation_documents")
+}
+
+model LegalKnowledgeChunk {
+  id          Int       @id @default(autoincrement())
+  sourceUrl   String    @map("source_url")
+  sourceTitle String    @map("source_title")
+  act         String?
+  section     String?
+  content     String
+  embedding   Unsupported("vector(1536)")
+  publishedAt DateTime? @map("published_at")
+  crawledAt   DateTime  @default(now()) @map("crawled_at")
+  contentHash String    @unique @map("content_hash")
+
+  @@map("legal_knowledge_chunks")
 }
