@@ -1029,3 +1029,129 @@ Two things: (1) a real content-quality bug found while verifying Firecrawl with 
 * **Browser-driven voice flow** (Playwright + Chromium's `--use-fake-device-for-media-stream`, since headless Chromium has no real mic): clicking the mic button shows a live recording indicator (pulsing dot + timer), stopping it uploads and round-trips through transcription → agent response → both messages rendered in the chat (user bubble tagged "Voice message", assistant clarify response with chips) — zero console errors, zero failed network requests. TTS playback ("Listen" button) correctly enters a loading state while synthesizing before playing.
 
 ---
+
+# 📄 In-Conversation Document Viewer (Phase 10)
+
+---
+
+## 📌 Overview
+
+Documents attached to a legal-agent conversation could only be inferred existed (a toast on attach, referenced implicitly by the AI) — there was no way to actually look at what was attached. Added a proper viewer.
+
+---
+
+## 🔑 What was built
+
+* **`document.repository.ts`**: added `getDocumentById`.
+* **`document.controller.ts` / `document.routes.ts`**: two new ownership-checked endpoints — `GET /documents/:id` (metadata + content: pasted text as-is, or on-demand `extractTextFromPDF` for file uploads, mirroring how `analysis.controller.ts` re-reads a document) and `GET /documents/:id/file` (streams the raw file with a correct `Content-Type` derived from extension — `application/pdf` etc. — and `Content-Disposition: inline` so browsers render it instead of downloading).
+* **`legal-agent.repository.ts`**: `getConversationWithMessages` now also includes `documents: { include: { document: true } }`, so a conversation's attached documents ride along with the normal conversation fetch — no extra endpoint needed for the client to know what's attached. `linkDocumentToConversation` (the attach upsert) now also includes the nested `document` so the attach response can update client state immediately without a refetch.
+
+---
+
+## ✅ Result (verified via curl + a byte-level check, plus the browser-driven test logged in `client/README.md`)
+
+* `GET /documents/:id/file` for a real uploaded PDF returned `Content-Type: application/pdf`, `Content-Disposition: inline`, and a byte-for-byte identical file (1,016,315 bytes, correct `%PDF-1.4` header) — confirms the stream is correct even though a headless-Chromium screenshot of the resulting `<iframe>` showed blank (a known headless-mode PDF-plugin limitation, not a data bug — a real browser renders it via its native PDF viewer).
+* Pasted-text documents render their content directly and correctly in the viewer modal.
+
+---
+
+# 🛡️ Rate Limiting, Citation Dedup & Scheduled Ingestion (Phase 11 — Phase 4 of the legal-agent plan, part 1)
+
+---
+
+## 📌 Overview
+
+First three of four "polish" items from the approved plan (deadline pressure turned out to be much lower than first assumed — 40+ days, not ~18 — so these are being done properly in tracked phases rather than rushed). Streaming responses (the fourth, and by far the largest) is deliberately being done last/separately since it's a real architecture change, not a small addition.
+
+---
+
+## 🔑 What was built
+
+### Rate limiting
+
+* New `common/middleware/rateLimit.middleware.ts` using `express-rate-limit`: `aiRateLimiter` (30 requests / 15 min) on the endpoints that actually cost OpenAI/Firecrawl money — `POST /legal-agent/conversations/:id/messages`, `.../voice-messages`, `POST /rag/ingest`, `POST /analysis/run`; `standardRateLimiter` (100/15min) on cheaper-but-real-cost endpoints — TTS playback (`GET /legal-agent/messages/:messageId/audio`, cached after first synthesis anyway), document upload/paste-text.
+* Keyed by **authenticated user id**, not IP — every guarded endpoint sits behind `authMiddleware` already, and IP-keying would either let one user bypass the limit by switching networks or unfairly throttle multiple users behind the same NAT.
+* **Real bug hit and fixed**: `express-rate-limit` v8's built-in validation throws `ERR_ERL_KEY_GEN_IPV6` if a custom `keyGenerator`'s IP fallback uses raw `req.ip` directly — local dev's `::1` (IPv6 loopback) isn't normalized and trips their safety check (meant to stop IPv6-representation bypass attacks). Fixed by wrapping the fallback in their own `ipKeyGenerator()` helper instead of using `req.ip` raw. Caught immediately on first real request, not left silently broken.
+
+### Citation dedup + cap
+
+* `legal-agent.service.ts::decideNextStep` — the model occasionally cited the same URL twice; citations are now deduped by URL and capped at 5 server-side before ever reaching the DB or client.
+
+### Scheduled RAG ingestion
+
+* New `modules/rag/rag.scheduler.ts` using `node-cron` (ships its own TS types as of v4, no separate `@types` package needed) — runs `ingestFromQueries()` daily at 03:00 server time, logging ok/failed counts; a failed run is caught and logged, never crashes the process, and the next scheduled tick just tries again. `POST /rag/ingest` still works for on-demand runs. Started once from `server.ts` on `app.listen`'s callback.
+
+---
+
+## ✅ Result
+
+* Verified end-to-end via `curl`: after the IPv6 fix, a real chat message round-trips cleanly through the rate limiter with no error; response citations came back deduped (1 unique source instead of a potential repeat).
+* Scheduler confirmed registering correctly on server startup (`[rag-scheduler] Scheduled RAG ingestion (cron: "0 3 * * *")` in logs); actual 3am fire not observed live (by design — didn't wait until 3am to check), but the cron expression and error handling were reviewed directly.
+
+---
+
+# ⚡ Streaming Responses (Phase 12 — Phase 4 of the legal-agent plan, part 2 — final item)
+
+---
+
+## 📌 Overview
+
+The last and largest Phase 4 item: the text-chat message endpoint now streams the assistant's answer token-by-token instead of making the client wait for one large non-streaming JSON response. Deliberately scoped to text messages only — voice messages already block on a transcription round trip before generation can start, so streaming their answer separately was judged not worth the added complexity for this pass (documented as a clear follow-up if wanted later).
+
+---
+
+## 🔑 Why a two-call design, not one
+
+OpenAI's `response_format: json_object` (used everywhere else in this codebase to get the clarify/answer discriminator + citations reliably) can't be streamed usefully — partial JSON tokens aren't valid JSON until the whole object is done, so there's nothing to progressively render. Streaming requires knowing you're going to *answer* (not ask a clarifying question) before any tokens are sent, since you can't retroactively switch to a clarify question after prose has already started reaching the client.
+
+Solution: split into two model calls for the streaming path only —
+1. **`routeMessage()`** (`legal-agent.prompt.ts::buildRoutingPrompt`) — the same fast, non-streaming JSON-mode call as before, but instructed to decide `clarify` vs `answer` **and pick relevant citations**, without writing the answer content itself.
+2. **`streamAnswer()`** (`legal-agent.prompt.ts::buildStreamingAnswerPrompt`) — only called when routing decided "answer"; a plain-text (no JSON mode) streaming completion (`stream: true`) that generates the actual prose, yielded as an async generator of text deltas.
+
+This costs one extra small model call per answer turn, but keeps citation selection informed and precise (the model still picks *which* retrieved sources it's actually using, rather than the app blindly attaching every RAG chunk that was retrieved regardless of relevance) while still delivering real, progressive token-by-token rendering.
+
+`decideNextStep()` (the original single-call, non-streaming function) is kept unchanged and still used by the voice-message path — `legal-agent.prompt.ts::buildSystemPrompt` (JSON mode, full clarify-or-answer-with-content) is untouched.
+
+---
+
+## 🔑 What was built
+
+* **`legal-agent.prompt.ts`** — persona/knowledge block factored out into a shared `PERSONA_AND_KNOWLEDGE()` builder reused by all three prompt variants; new `buildRoutingPrompt()` and `buildStreamingAnswerPrompt()` alongside the existing `buildSystemPrompt()`.
+* **`legal-agent.service.ts`** — new `routeMessage()`, `streamAnswer()` (an `async function*` yielding string deltas), `getRagContext()` (RAG lookup factored out for reuse by both the controller and `decideNextStep`), `appendDisclaimer()` (disclaimer-appending factored out so both the streaming and non-streaming paths share the exact same server-side-enforced disclaimer logic), `dedupeCitations()`.
+* **`legal-agent.controller.ts::sendMessageHandler`** rewritten as an SSE endpoint: sets `Content-Type: text/event-stream`, writes `data: {...}\n\n` frames — `{type:"user_message"}` immediately (the persisted user message, replacing the client's optimistic one), then either a single `{type:"done"}` frame (clarify path) or a stream of `{type:"delta", text}` frames followed by `{type:"done"}` (answer path, disclaimer appended once streaming finishes and the full message is persisted). A `streaming` flag tracks whether headers have already been sent, so a failure mid-stream sends a `{type:"error"}` frame and closes gracefully instead of calling `next(err)` into a response that's already started (which would crash).
+* **`legal-agent.controller.ts`** also gained a `buildDocumentContext()` extraction (shared by the streaming and voice paths) and — found while regression-testing this change — a real bug fix: `sendVoiceMessageHandler` now wraps the Whisper `transcribeAudio()` call in try/catch, converting an unwrapped OpenAI `APIError` (e.g. "Invalid file format" for corrupt/unsupported audio) into a clean `AppError(400, ...)` instead of an opaque 500 — same discipline as the rest of this codebase (Phase 6 fixed the same bug class for document analysis).
+* **`legal-agent.repository.ts`** — `appendMessage`'s `citations` param retyped from `Prisma.InputJsonValue` to a plain `{title,url}[]` after hitting a real TS structural-typing quirk (a named `Citation` interface without an index signature doesn't satisfy `Prisma.InputJsonObject`'s index-signature requirement the way an inline object-literal type happened to).
+
+---
+
+## ✅ Result
+
+* Verified via `curl --no-buffer`: a real answer-worthy question produced genuine `data: {"type":"delta","text":"..."}` frames arriving one OpenAI token-chunk at a time (confirmed visually — dozens of small deltas like `"Ant"`, `"icip"`, `"atory"`, `" bail"`), followed by a final `{"type":"done", message: {...}}` carrying the persisted, disclaimer-appended, citation-attached message row.
+* Clarify path verified through the same endpoint: single `user_message` + `done` frame pair, correct chip options, no unnecessary streaming overhead for a response that's fast anyway.
+* Regression-tested the voice-message and document-attach paths after the shared-code refactor (`buildDocumentContext`) — both still work correctly; the only issue surfaced was the pre-existing unwrapped-Whisper-error gap above, now fixed.
+
+---
+
+# 🎙️ Live Voice Editing + ALDRA AI Identity (Phase 13)
+
+---
+
+## 📌 Overview
+
+Two changes: (1) a standalone transcription endpoint to support a redesigned mic UX where speech becomes editable draft text instead of an instantly-sent message (see `client/README.md` Phase 7 for the full UX rationale — live captions while speaking, edit by typing or by speaking more, explicit send); (2) the agent now identifies itself as "ALDRA AI" when asked who it is.
+
+---
+
+## 🔑 What was built
+
+* **New `modules/speech/speech.controller.ts` + `speech.routes.ts`**: `POST /speech/transcribe` — auth + `aiRateLimiter`-protected, accepts a multipart audio file (+ optional `language`), returns `{ transcript }` only. Deliberately does **not** touch any conversation or call the agent — unlike `/legal-agent/conversations/:id/voice-messages` (which still exists, unused by the current UI but left in place), this is a pure transcription utility the client uses as a fallback when the browser has no live Web Speech API support (primarily Firefox). Reuses the existing `transcribeAudio()` service function and the same try/catch → `AppError(400, ...)` wrapping added in Phase 12 for corrupt/unsupported audio.
+* **`legal-agent.prompt.ts::PERSONA_AND_KNOWLEDGE`** — now opens with "You are ALDRA AI, an AI legal information assistant..." and an explicit instruction to answer identity questions ("who are you", "what can you do") as ALDRA AI rather than a generic name. Since this shared block feeds all three prompt variants (`buildSystemPrompt`, `buildRoutingPrompt`, `buildStreamingAnswerPrompt`), the identity is consistent across the voice, streaming-answer, and clarify-routing paths without needing three separate edits.
+
+---
+
+## ✅ Result
+
+* Verified via Playwright: asking "Who are you and how can you help me?" produced "I am ALDRA AI, an AI legal information assistant specializing in Indian law..." followed by the same capability description as before — name changed, substance preserved, exactly as requested.
+* `/speech/transcribe` verified as part of the client-side fallback flow (see client README) — correctly returns transcript text without creating any conversation activity.
+
+---

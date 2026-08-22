@@ -18,6 +18,10 @@ export const createTextDocument = async (
   });
 };
 
+export const getDocumentById = async (documentId: number) => {
+  return prisma.document.findUnique({ where: { id: documentId } });
+};
+
 export const getUserDocuments = async (userId: number) => {
   return prisma.document.findMany({
     where: { userId },
