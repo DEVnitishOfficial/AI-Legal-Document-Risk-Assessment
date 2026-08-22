@@ -274,5 +274,26 @@ Verified in a real headless-browser session (login persisted across refresh, pas
 
 ---
 
+# 🩹 Result Panel Scroll Fix
+
+---
+
+## 📌 Overview
+
+On documents with a long analysis (many risk items), the result panel grew past the viewport instead of scrolling internally — the whole page overflowed, pushing the layout down with dead space below.
+
+## 🔑 Root Cause & Fix
+
+`ResultPanel.tsx` already had `overflow-y-auto`, but none of its ancestors (`Dashboard.tsx` / `DocumentsPage.tsx`'s grid row and cell) had a bounded height for that overflow to clip against — by default, flex/grid items refuse to shrink below their content's natural size (`min-height: auto`), so the tall content just grew the whole page instead of scrolling in place.
+
+* `Dashboard.tsx` / `DocumentsPage.tsx` — added `min-h-0` down the flex/grid container chain (the main content grid, and a wrapping `div` around each grid cell).
+* `ResultPanel.tsx` — added `h-full min-h-0` to its root element in all three render states (analyzing / empty / populated).
+
+## ✅ Result
+
+Verified with a long test document: `document.body.scrollHeight` now exactly matches the viewport height (no page-level overflow), and the result panel scrolls independently while the sidebar and top bar stay fixed in place.
+
+---
+
 
 
