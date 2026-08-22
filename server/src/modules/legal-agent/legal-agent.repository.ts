@@ -42,6 +42,10 @@ export const setConversationTitle = async (conversationId: number, title: string
     return prisma.conversation.update({ where: { id: conversationId }, data: { title } });
 };
 
+export const updateConversationLanguage = async (conversationId: number, language: string) => {
+    return prisma.conversation.update({ where: { id: conversationId }, data: { language } });
+};
+
 export const linkDocumentToConversation = async (conversationId: number, documentId: number) => {
     return prisma.conversationDocument.upsert({
         where: { conversationId_documentId: { conversationId, documentId } },

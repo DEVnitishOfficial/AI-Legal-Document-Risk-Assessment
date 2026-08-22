@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   FileText,
+  Scale,
   LogOut,
   Menu,
   X,
@@ -44,6 +45,7 @@ export default function Sidebar() {
   const navItems = [
     { label: "Dashboard", icon: <LayoutDashboard />, path: "/dashboard" },
     { label: "Documents", icon: <FileText />, path: "/documents" },
+    { label: "Legal Assistant", icon: <Scale />, path: "/legal-assistant" },
   ];
 
   return (

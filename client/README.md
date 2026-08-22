@@ -295,5 +295,42 @@ Verified with a long test document: `document.body.scrollHeight` now exactly mat
 
 ---
 
+# ⚖️ Legal Assistant Chat UI (Phase 2)
+
+---
+
+## 📌 Overview
+
+Frontend for the Indian-law "specialist" chat agent backend built in server Phase 8 — a new `/legal-assistant` page: ChatGPT-style conversation rail, message bubbles with markdown rendering, the clarifying-question chip UX, document attach, and an English/Hindi toggle. Voice input/output is intentionally not built yet (Phase 3) — the mic button exists but is disabled with a "coming soon" tooltip so the roadmap is visible instead of hidden.
+
+---
+
+## 🔑 What was built
+
+* **`features/legal-agent/`** — `types.ts` (shared `Conversation`/`Message` shapes), `useLegalChat.ts` (local-hook state, matching the existing `useDocumentAnalysis` convention rather than a Redux slice — conversation state doesn't need to be global), and presentational components: `MessageBubble` (React Markdown rendering with a custom `components` map since no `@tailwindcss/typography` plugin is installed; renders citation links when present), `ClarifyOptions` (chip buttons + an "Other" free-text fallback, directly mirroring the AskUserQuestion-style UX the feature was modeled on), `ChatInput` (text + attach + disabled mic placeholder + EN/हिं language toggle + send), `ChatWindow` (always-visible disclaimer banner, empty state, "thinking" shimmer while waiting on the AI), `ConversationSidebar` (history rail), `EmptyState` (four starter prompts, including the "false case out of jealousy, fear of arrest" scenario), `AttachDocumentModal` (reuses the same upload/paste-text pattern as `UploadPanel`, scoped to linking a document into the active conversation).
+* **New page + routing**: `pages/LegalAssistant.tsx` composes all of the above; new protected route `/legal-assistant` in `App.tsx`; new "Legal Assistant" nav entry (Scale icon) pushed into `Sidebar.tsx`'s `navItems`.
+* **New dependency**: `react-markdown`.
+* **Small backend addition**: `PATCH /legal-agent/conversations/:id` (language field only) — needed so the language toggle can switch an *existing* conversation's response language, not just set it at creation time.
+
+---
+
+## ✅ Result (verified with Playwright driving a real headless Chromium against the actual dev servers — no project skill existed for this yet, so a throwaway driver script was used; recommended `/run-skill-generator` territory if this project needs UI testing again)
+
+* Empty state renders correctly: disclaimer banner, welcome copy, and 4 starter prompt chips.
+* Typing/sending a vague message ("I want to file a case against someone.") creates a new conversation (appears in the rail), shows the user bubble, then a `clarify`-kind assistant response with the correct chip options rendered.
+* Clicking a clarify chip sends it as the next message; the agent asked a *second* clarifying question in this run (multi-turn, not a bug) before giving a full answer — confirming the agent doesn't rush to an answer without enough context, matching the "ask before you answer" requirement.
+* The exact "relative filed a false case out of jealousy, fear of arrest" scenario produced a full markdown-formatted answer (paragraph text, correct emphasis styling on the disclaimer) plus a citation link ("Anticipatory Bail Procedure in India") rendered distinctly at the bottom of the bubble.
+* Language toggle switches both the input placeholder and the disclaimer banner to Hindi correctly.
+* Dark mode verified on the full chat page — banner, bubbles, chips, and input bar all remain readable, no unstyled/invisible regions.
+* Zero browser console errors and zero failed network requests across the entire flow.
+
+---
+
+## ⏭️ Next (Phase 3+)
+
+Voice: mic capture via `MediaRecorder` → Whisper STT → send as a normal chat message; TTS playback of assistant replies. Then Phase 4 polish (streaming responses, richer citations UI, rate limiting).
+
+---
+
 
 

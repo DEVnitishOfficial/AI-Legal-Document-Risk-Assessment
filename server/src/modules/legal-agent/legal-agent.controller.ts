@@ -8,6 +8,7 @@ import {
     getConversationWithMessages,
     appendMessage,
     setConversationTitle,
+    updateConversationLanguage,
     linkDocumentToConversation,
     getConversationDocumentsText,
 } from "./legal-agent.repository";
@@ -49,6 +50,24 @@ export const getConversationHandler = async (req: any, res: Response, next: Next
     try {
         const conversationId = Number(req.params.id);
         const conversation = await getOwnedConversation(conversationId, req.user?.id);
+
+        res.json({ success: true, data: { conversation } });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateConversationHandler = async (req: any, res: Response, next: NextFunction) => {
+    try {
+        const conversationId = Number(req.params.id);
+        const { language } = req.body;
+
+        if (language !== "en" && language !== "hi") {
+            throw new AppError("language must be 'en' or 'hi'", 400);
+        }
+
+        await getOwnedConversation(conversationId, req.user?.id);
+        const conversation = await updateConversationLanguage(conversationId, language);
 
         res.json({ success: true, data: { conversation } });
     } catch (err) {
