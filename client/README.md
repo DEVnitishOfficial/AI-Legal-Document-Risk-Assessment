@@ -262,18 +262,6 @@ The app (Tailwind v4, CSS-first config, no `tailwind.config.js`) had zero theme 
 
 ---
 
-## ✅ Result
-
-Verified in a real headless-browser session (login persisted across refresh, paste-text → analyze → click into `/documents` → same report, theme toggle on every page):
-
-* Real name and avatar initial shown immediately after both login methods, and survives a hard refresh
-* Clicking a document on `/documents` shows the identical AI analysis report as Dashboard
-* Structured risk cards (severity + category chips) and the risk-score bar render correctly
-* Theme toggles correctly on Home, Login, Register, Dashboard, and Documents, with no invisible-text or unstyled regions in either mode, and the choice survives a page refresh
-* Zero console errors across the full flow
-
----
-
 # 🩹 Result Panel Scroll Fix
 
 ---
@@ -314,21 +302,28 @@ Frontend for the Indian-law "specialist" chat agent backend built in server Phas
 
 ---
 
-## ✅ Result (verified with Playwright driving a real headless Chromium against the actual dev servers — no project skill existed for this yet, so a throwaway driver script was used; recommended `/run-skill-generator` territory if this project needs UI testing again)
-
-* Empty state renders correctly: disclaimer banner, welcome copy, and 4 starter prompt chips.
-* Typing/sending a vague message ("I want to file a case against someone.") creates a new conversation (appears in the rail), shows the user bubble, then a `clarify`-kind assistant response with the correct chip options rendered.
-* Clicking a clarify chip sends it as the next message; the agent asked a *second* clarifying question in this run (multi-turn, not a bug) before giving a full answer — confirming the agent doesn't rush to an answer without enough context, matching the "ask before you answer" requirement.
-* The exact "relative filed a false case out of jealousy, fear of arrest" scenario produced a full markdown-formatted answer (paragraph text, correct emphasis styling on the disclaimer) plus a citation link ("Anticipatory Bail Procedure in India") rendered distinctly at the bottom of the bubble.
-* Language toggle switches both the input placeholder and the disclaimer banner to Hindi correctly.
-* Dark mode verified on the full chat page — banner, bubbles, chips, and input bar all remain readable, no unstyled/invisible regions.
-* Zero browser console errors and zero failed network requests across the entire flow.
-
----
-
 ## ⏭️ Next (Phase 3+)
 
 Voice: mic capture via `MediaRecorder` → Whisper STT → send as a normal chat message; TTS playback of assistant replies. Then Phase 4 polish (streaming responses, richer citations UI, rate limiting).
+
+---
+
+# 🎙️ Voice Input/Output (Phase 3)
+
+---
+
+## 📌 Overview
+
+Replaces the disabled mic placeholder from Phase 2 with real voice: press-to-record via `MediaRecorder`, uploaded and transcribed server-side, plus on-demand TTS playback of any assistant reply.
+
+---
+
+## 🔑 What was built
+
+* **`ChatInput.tsx`** — real recording: `navigator.mediaDevices.getUserMedia({ audio: true })` → `MediaRecorder` (mime type feature-detected via `MediaRecorder.isTypeSupported`, preferring `audio/webm;codecs=opus`) → chunks collected in `ondataavailable`, assembled into a `Blob` in `onstop` and handed to a new `onSendVoice` prop. While recording, the textarea is replaced with a live indicator (pulsing dot + `MM:SS` timer via `setInterval`) and the mic button becomes a red stop button; attach/language/send are disabled mid-recording to keep the input mode unambiguous. Mic-permission denial surfaces as a toast instead of a silent failure.
+* **`useLegalChat.ts`** — new `sendVoiceMessage(audioBlob)`, mirroring `sendMessage` but posting `FormData` to the new `/voice-messages` endpoint; unlike text sends there's no optimistic user bubble (the transcript isn't known client-side), so both the transcribed `userMessage` and the assistant `message` from the response are pushed into state together once the round trip completes.
+* **`MessageBubble.tsx`** — a "Voice message" badge (mic icon) on any message with `kind: "voice"`; a "Listen" button on assistant replies that fetches `/legal-agent/messages/:id/audio` as a blob (via the existing `API` axios instance, so auth headers are attached automatically — deliberately *not* done via a plain `<audio src>` with a token query param, which would leak the JWT into logs/history), builds an object URL, and plays it with the native `Audio` API. Button cycles through idle/loading (spinner)/playing (pause icon) states.
+* **`LegalAssistant.tsx`** — wires `sendVoiceMessage` into `ChatInput`'s new `onSendVoice` prop.
 
 ---
 

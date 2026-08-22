@@ -17,6 +17,7 @@ export default function LegalAssistant() {
         selectConversation,
         startNewConversation,
         sendMessage,
+        sendVoiceMessage,
         changeLanguage,
         attachDocument,
     } = useLegalChat();
@@ -46,6 +47,7 @@ export default function LegalAssistant() {
 
                 <ChatInput
                     onSend={sendMessage}
+                    onSendVoice={sendVoiceMessage}
                     onAttachClick={() => setShowAttachModal(true)}
                     language={language}
                     onLanguageChange={changeLanguage}

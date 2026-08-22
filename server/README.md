@@ -994,3 +994,38 @@ New second feature alongside document analysis: an interactive Indian-law "speci
 Chat UI (new page, conversation list, clarify-chip rendering, EN/HI toggle, document attach), voice (OpenAI Whisper STT + TTS), then polish (streaming responses, citations UI, scheduled ingestion). See the approved plan for full detail.
 
 ---
+
+# 🔍 RAG Seed-Content Fix + Voice (Phase 9)
+
+---
+
+## 📌 Overview
+
+Two things: (1) a real content-quality bug found while verifying Firecrawl with the user's real API key — the Phase 8 default seed URL only ever ingested navigation noise, not case law — fixed by switching to search-based ingestion; and (2) Phase 3 of the legal-agent plan, voice: mic input via Whisper STT and TTS playback of assistant replies.
+
+---
+
+## 🔑 RAG fix
+
+* **Root cause**: `DEFAULT_SEED_URLS` (Phase 8) pointed `crawlAndIngest` at `indiankanoon.org/browse/supremecourt/` — a year-index page. Scraped chunks were literally a table of years and case counts, zero substantive legal content. Confirmed by inspecting stored `content` directly via `psql` — this was **not** a Firecrawl failure, Firecrawl scraped exactly what was asked; the seed URL choice was the bug.
+* **Fix** (`rag.ingest.ts`): replaced the static-URL default with `searchAndIngest(query)` / `ingestFromQueries(queries)`, using `firecrawl.search(query, { includeDomains: ["indiankanoon.org"], scrapeOptions: { formats: ["markdown"] } })` to find and scrape real judgment pages. `crawlAndIngest(urls)` is kept for when specific URLs are already known. `rag.controller.ts::runIngest` now accepts `{ urls }` (explicit scrape) or `{ queries }` (search), defaulting to `DEFAULT_SEED_QUERIES` — four queries covering anticipatory bail, cybercrime/bank fraud, dowry, and malicious prosecution, matching the domains the legal-agent system prompt covers.
+* **Verified with the user's real `FIRECRAWL_API_KEY`**: search-based ingestion pulled 8 real, correctly-titled Supreme Court/High Court judgments (e.g. *Sushila Aggarwal vs State (NCT of Delhi), 2020* — the actual landmark anticipatory-bail Constitution Bench ruling), 139 chunks from that one judgment alone. Confirmed the chunk is later retrieved and cited **live in an actual chat answer** (not just the isolated retrieval test) — a real "What is anticipatory bail?" question returned an answer citing that exact judgment.
+* **Gotcha hit twice this session**: `nodemon` watches the whole server directory (`watching path(s): *.*`), so creating/editing *any* server file — including a throwaway scratch script — restarts the dev process mid-request and kills any in-flight `curl`/ingestion call (`ECONNREFUSED`/connection-reset). Sequence file edits and long-running test requests so they don't overlap; don't touch server files while an ingestion batch is running.
+
+## 🔑 Voice (Phase 3 of the legal-agent plan)
+
+* **`modules/speech/speech.service.ts`**: `transcribeAudio(filePath, language?)` via OpenAI `whisper-1`; `synthesizeSpeech(text)` via OpenAI `tts-1` (voice `alloy`), returns a `Buffer`.
+* **`legal-agent.controller.ts` refactored**: the clarify/answer/document-context/title logic that `sendMessageHandler` had inline was extracted into a shared `processUserMessage(conversation, content, extra)` helper, now used by both `sendMessageHandler` (text) and the new `sendVoiceMessageHandler` (audio) — avoids duplicating the whole pipeline for two input modes that differ only in how `content` was obtained.
+* **`POST /legal-agent/conversations/:id/voice-messages`**: multipart audio upload (reuses the existing `multer` config) → `transcribeAudio` → same clarify/answer pipeline as text, persisting the user message with `kind: "voice"` and `audioUrl` pointing at the uploaded recording. Response includes both the transcribed `userMessage` and the assistant `message`, since the client doesn't know the transcript until the server produces it.
+* **`GET /legal-agent/messages/:messageId/audio`**: on-demand TTS for any message — synthesizes once, caches to `uploads/audio/message-{id}.mp3`, and serves the cached file on repeat requests (checked via `fs.existsSync` before re-synthesizing) so replay is free.
+* **`legal-agent.repository.ts`**: added `getMessageById`, `setMessageAudioUrl`; `appendMessage`'s data type gained an optional `audioUrl`.
+* **`server/.gitignore`**: added `/uploads` — Phase 3 substantially increases what lands there (voice recordings + synthesized TTS clips) and the directory wasn't ignored before (some previously-uploaded PDFs are already tracked in git from before this session; not untracked automatically by this change — flagged for the user to decide on separately, not addressed here).
+
+---
+
+## ✅ Result
+
+* **TTS→STT round trip** (`synthesizeSpeech` then `transcribeAudio` on the output, via a throwaway script): input `"Someone hacked my bank account and stole fifteen thousand rupees, what should I do?"` → transcribed back as `"Someone hacked my bank account and stole 15,000 rupees. What should I do?"` — correct content, only cosmetic number/punctuation normalization. Confirms both directions of the OpenAI audio integration work correctly with real speech.
+* **Browser-driven voice flow** (Playwright + Chromium's `--use-fake-device-for-media-stream`, since headless Chromium has no real mic): clicking the mic button shows a live recording indicator (pulsing dot + timer), stopping it uploads and round-trips through transcription → agent response → both messages rendered in the chat (user bubble tagged "Voice message", assistant clarify response with chips) — zero console errors, zero failed network requests. TTS playback ("Listen" button) correctly enters a loading state while synthesizing before playing.
+
+---

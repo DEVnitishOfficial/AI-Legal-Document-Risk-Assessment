@@ -114,6 +114,45 @@ export function useLegalChat() {
         [ensureConversation]
     );
 
+    const sendVoiceMessage = useCallback(
+        async (audioBlob: Blob) => {
+            const conversationId = await ensureConversation();
+            if (!conversationId) return;
+
+            setSending(true);
+            try {
+                const formData = new FormData();
+                formData.append("audio", audioBlob, "voice-message.webm");
+
+                const res = await API.post(
+                    `/legal-agent/conversations/${conversationId}/voice-messages`,
+                    formData
+                );
+                const { userMessage, message: assistantMessage } = res.data.data;
+                setMessages((prev) => [...prev, userMessage, assistantMessage]);
+
+                setConversations((prev) =>
+                    prev
+                        .map((c) =>
+                            c.id === conversationId
+                                ? {
+                                      ...c,
+                                      title: c.title || userMessage.content.slice(0, 60),
+                                      updatedAt: new Date().toISOString(),
+                                  }
+                                : c
+                        )
+                        .sort((a, b) => (a.id === conversationId ? -1 : b.id === conversationId ? 1 : 0))
+                );
+            } catch (err: any) {
+                toast.error(err?.response?.data?.message || "Failed to send voice message");
+            } finally {
+                setSending(false);
+            }
+        },
+        [ensureConversation]
+    );
+
     const changeLanguage = useCallback(
         async (lang: ChatLanguage) => {
             setLanguageState(lang);
@@ -157,6 +196,7 @@ export function useLegalChat() {
         selectConversation,
         startNewConversation,
         sendMessage,
+        sendVoiceMessage,
         changeLanguage,
         attachDocument,
     };

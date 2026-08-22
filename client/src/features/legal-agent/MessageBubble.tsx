@@ -1,6 +1,9 @@
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { motion } from "framer-motion";
-import { Scale, User } from "lucide-react";
+import { Scale, User, Mic, Volume2, Loader2, PauseCircle } from "lucide-react";
+import toast from "react-hot-toast";
+import API from "../../services/api";
 import type { Message } from "./types";
 
 // No @tailwindcss/typography plugin is installed, so markdown elements are
@@ -16,8 +19,36 @@ const markdownComponents = {
     ),
 };
 
+type PlaybackState = "idle" | "loading" | "playing";
+
 export default function MessageBubble({ message }: { message: Message }) {
     const isUser = message.role === "user";
+    const [playback, setPlayback] = useState<PlaybackState>("idle");
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    const togglePlayback = async () => {
+        if (playback === "playing") {
+            audioRef.current?.pause();
+            setPlayback("idle");
+            return;
+        }
+
+        setPlayback("loading");
+        try {
+            const res = await API.get(`/legal-agent/messages/${message.id}/audio`, {
+                responseType: "blob",
+            });
+            const url = URL.createObjectURL(res.data);
+            const audio = new Audio(url);
+            audioRef.current = audio;
+            audio.onended = () => setPlayback("idle");
+            await audio.play();
+            setPlayback("playing");
+        } catch (err) {
+            toast.error("Couldn't play audio for this message");
+            setPlayback("idle");
+        }
+    };
 
     return (
         <motion.div
@@ -45,6 +76,16 @@ export default function MessageBubble({ message }: { message: Message }) {
                         : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-sm"
                 }`}
             >
+                {message.kind === "voice" && (
+                    <div
+                        className={`flex items-center gap-1 text-xs mb-1 ${
+                            isUser ? "text-purple-100" : "text-gray-500 dark:text-gray-400"
+                        }`}
+                    >
+                        <Mic size={11} /> Voice message
+                    </div>
+                )}
+
                 <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
 
                 {message.citations && message.citations.length > 0 && (
@@ -61,6 +102,23 @@ export default function MessageBubble({ message }: { message: Message }) {
                             </a>
                         ))}
                     </div>
+                )}
+
+                {!isUser && message.kind !== "clarify" && (
+                    <button
+                        onClick={togglePlayback}
+                        title={playback === "playing" ? "Pause" : "Listen to this reply"}
+                        className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-300 transition"
+                    >
+                        {playback === "loading" ? (
+                            <Loader2 size={13} className="animate-spin" />
+                        ) : playback === "playing" ? (
+                            <PauseCircle size={13} />
+                        ) : (
+                            <Volume2 size={13} />
+                        )}
+                        {playback === "playing" ? "Playing" : "Listen"}
+                    </button>
                 )}
             </div>
         </motion.div>

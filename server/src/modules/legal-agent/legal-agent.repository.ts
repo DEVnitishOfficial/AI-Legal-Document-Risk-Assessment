@@ -27,6 +27,7 @@ export const appendMessage = async (
         kind?: string;
         clarifyOptions?: Prisma.InputJsonValue;
         citations?: Prisma.InputJsonValue;
+        audioUrl?: string;
     }
 ) => {
     return prisma.$transaction([
@@ -36,6 +37,14 @@ export const appendMessage = async (
             data: { updatedAt: new Date() },
         }),
     ]);
+};
+
+export const getMessageById = async (messageId: number) => {
+    return prisma.message.findUnique({ where: { id: messageId } });
+};
+
+export const setMessageAudioUrl = async (messageId: number, audioUrl: string) => {
+    return prisma.message.update({ where: { id: messageId }, data: { audioUrl } });
 };
 
 export const setConversationTitle = async (conversationId: number, title: string) => {
