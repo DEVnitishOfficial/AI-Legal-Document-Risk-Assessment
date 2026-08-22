@@ -3,7 +3,14 @@ import path from "path";
 import { Response, NextFunction } from "express";
 import { AppError } from "../../common/errors/AppError";
 import { extractTextFromPDF } from "../../common/utils/pdf";
-import { decideNextStep, ChatTurn } from "./legal-agent.service";
+import {
+    decideNextStep,
+    routeMessage,
+    streamAnswer,
+    getRagContext,
+    appendDisclaimer,
+    ChatTurn,
+} from "./legal-agent.service";
 import { transcribeAudio, synthesizeSpeech } from "../speech/speech.service";
 import {
     createConversation,
@@ -33,9 +40,29 @@ const getOwnedConversation = async (conversationId: number, userId?: number) => 
     return conversation;
 };
 
-// Shared by the text and voice message endpoints — the only difference
-// between them is how `content` was obtained (typed vs. transcribed), the
-// clarify/answer/document-context/title logic is identical either way.
+// Best-effort document context: a failed extraction (e.g. a
+// scanned/image-only PDF pdf-parse can't read) shouldn't block the chat
+// turn, just means that document's content is unavailable. Shared by both
+// the streaming text-message path and the non-streaming voice path.
+const buildDocumentContext = async (conversation: OwnedConversation): Promise<string> => {
+    const attachedDocs = await getConversationDocumentsText(conversation.id);
+    const documentTexts = await Promise.all(
+        attachedDocs.map(async (doc) => {
+            try {
+                const text = doc.filePath ? await extractTextFromPDF(doc.filePath) : doc.content ?? "";
+                return `Document "${doc.title ?? doc.filePath ?? "attached document"}":\n${text.slice(0, 3000)}`;
+            } catch (err) {
+                console.error(`Failed to read attached document ${doc.id}:`, err);
+                return "";
+            }
+        })
+    );
+    return documentTexts.filter(Boolean).join("\n\n");
+};
+
+// Used by the voice-message endpoint — single non-streaming call that
+// decides clarify vs answer AND generates the full content together (see
+// legal-agent.service.ts::decideNextStep for why voice doesn't stream).
 const processUserMessage = async (
     conversation: OwnedConversation,
     content: string,
@@ -51,23 +78,7 @@ const processUserMessage = async (
         { role: "user", content },
     ];
 
-    // Best-effort document context: a failed extraction (e.g. a
-    // scanned/image-only PDF pdf-parse can't read) shouldn't block the
-    // chat turn, just means that document's content is unavailable.
-    const attachedDocs = await getConversationDocumentsText(conversation.id);
-    const documentTexts = await Promise.all(
-        attachedDocs.map(async (doc) => {
-            try {
-                const text = doc.filePath ? await extractTextFromPDF(doc.filePath) : doc.content ?? "";
-                return `Document "${doc.title ?? doc.filePath ?? "attached document"}":\n${text.slice(0, 3000)}`;
-            } catch (err) {
-                console.error(`Failed to read attached document ${doc.id}:`, err);
-                return "";
-            }
-        })
-    );
-    const documentContext = documentTexts.filter(Boolean).join("\n\n");
-
+    const documentContext = await buildDocumentContext(conversation);
     const result = await decideNextStep(history, language, documentContext);
 
     const userMessageRow = await appendMessage(conversation.id, {
@@ -166,7 +177,13 @@ export const attachDocumentHandler = async (req: any, res: Response, next: NextF
     }
 };
 
+// Streams the assistant's answer token-by-token over SSE so the client can
+// render it as it's generated. Clarify responses are short enough that
+// streaming them wouldn't help, but they're sent through the same SSE
+// framing so the client only needs one code path to parse either outcome.
 export const sendMessageHandler = async (req: any, res: Response, next: NextFunction) => {
+    let streaming = false;
+
     try {
         const conversationId = Number(req.params.id);
         const { content } = req.body;
@@ -176,12 +193,83 @@ export const sendMessageHandler = async (req: any, res: Response, next: NextFunc
         }
 
         const conversation = await getOwnedConversation(conversationId, req.user?.id);
-        const { result, message } = await processUserMessage(conversation, content);
+        const language = conversation.language === "hi" ? "hi" : "en";
 
-        res.json({ success: true, data: { result, message } });
+        const history: ChatTurn[] = [
+            ...conversation.messages.map((m) => ({
+                role: m.role as "user" | "assistant",
+                content: m.content,
+            })),
+            { role: "user", content },
+        ];
+
+        const documentContext = await buildDocumentContext(conversation);
+        const ragContext = await getRagContext(content);
+
+        // Routing decision happens before any streaming starts — we can't
+        // retroactively switch to a clarify question after tokens have
+        // already been sent to the client.
+        const route = await routeMessage(history, language, documentContext, ragContext);
+
+        const userMessageRow = await appendMessage(conversationId, { role: "user", content, kind: "text" });
+
+        streaming = true;
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.flushHeaders();
+
+        const sendEvent = (data: unknown) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+        sendEvent({ type: "user_message", message: userMessageRow[0] });
+
+        let assistantMessageRow;
+
+        if (route.type === "clarify") {
+            assistantMessageRow = await appendMessage(conversationId, {
+                role: "assistant",
+                content: route.question!,
+                kind: "clarify",
+                clarifyOptions: route.options,
+            });
+        } else {
+            let fullText = "";
+            for await (const deltaText of streamAnswer(history, language, documentContext, ragContext)) {
+                fullText += deltaText;
+                sendEvent({ type: "delta", text: deltaText });
+            }
+
+            assistantMessageRow = await appendMessage(conversationId, {
+                role: "assistant",
+                content: appendDisclaimer(fullText),
+                kind: "text",
+                citations: route.citations ?? [],
+            });
+        }
+
+        if (!conversation.title) {
+            await setConversationTitle(conversationId, content.trim().slice(0, 60));
+        }
+
+        sendEvent({ type: "done", message: assistantMessageRow[0] });
+        res.end();
     } catch (err) {
         console.error("Error occurred while sending legal-agent message:", err);
-        next(err);
+
+        if (streaming) {
+            try {
+                res.write(
+                    `data: ${JSON.stringify({
+                        type: "error",
+                        message: "Something went wrong generating a response.",
+                    })}\n\n`
+                );
+                res.end();
+            } catch {
+                // Response already closed — nothing more we can do.
+            }
+        } else {
+            next(err);
+        }
     }
 };
 
@@ -196,7 +284,18 @@ export const sendVoiceMessageHandler = async (req: any, res: Response, next: Nex
         const conversation = await getOwnedConversation(conversationId, req.user?.id);
         const language = conversation.language === "hi" ? "hi" : "en";
 
-        const transcript = await transcribeAudio(req.file.path, language);
+        let transcript: string;
+        try {
+            transcript = await transcribeAudio(req.file.path, language);
+        } catch (err) {
+            // Whisper rejects unsupported/corrupt audio with its own
+            // APIError — surface that as a clean 400 instead of an opaque
+            // 500 (same discipline as the rest of this codebase: never let
+            // an unwrapped upstream error reach the client as "Internal
+            // Server Error").
+            console.error("Whisper transcription failed:", err);
+            throw new AppError("Could not process this audio — please try recording again", 400);
+        }
 
         if (!transcript.trim()) {
             throw new AppError("Could not transcribe audio — please try again", 400);

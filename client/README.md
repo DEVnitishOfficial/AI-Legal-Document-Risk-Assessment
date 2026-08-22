@@ -327,5 +327,114 @@ Replaces the disabled mic placeholder from Phase 2 with real voice: press-to-rec
 
 ---
 
+# 📄 In-Conversation Document Viewer (Phase 4)
 
+---
 
+## 📌 Overview
+
+Documents attached to a conversation had no way to actually be viewed — attaching one just fired a toast. Added a click-to-preview popup so the user can read exactly what they uploaded/pasted while chatting about it.
+
+---
+
+## 🔑 What was built
+
+* **`types.ts`** — new `AttachedDocument` and `ConversationDocumentLink` shapes; `Conversation` gained an optional `documents` field (matches the backend now including attached documents on the conversation fetch).
+* **`useLegalChat.ts`** — new `attachedDocuments` state, populated from `conversation.documents` on `selectConversation`, reset on `startNewConversation`, and appended to immediately on a successful `attachDocument()` call (using the document object the backend now returns from the attach endpoint) — no extra round trip needed either way.
+* **New `AttachedDocumentsBar.tsx`** — a compact strip of document chips (file icon + title/filename) rendered between the message list and the input bar, only when the active conversation has attachments; clicking a chip opens the viewer.
+* **New `DocumentViewerModal.tsx`** — fetches `GET /documents/:id` for metadata, then either: (a) for file uploads, fetches `GET /documents/:id/file` as a blob via the authed `API` instance and renders it in an `<iframe>` from an object URL (same reasoning as the audio playback: a raw `<iframe src>` can't attach an Authorization header, and a token-in-URL would leak it), or (b) for pasted-text documents, renders the extracted/stored text directly in a scrollable `<pre>`. Large modal (`max-w-4xl h-[85vh]`) since the point is to actually read the document comfortably.
+* **`LegalAssistant.tsx`** — wires the bar and modal in with a `viewingDocumentId` state.
+
+---
+
+## ✅ Result (verified with Playwright: registered a user, attached both a pasted-text document and a real PDF — `pdf-parse`'s own test fixture — to a conversation)
+
+* Both attach flows work; two document chips appear in the bar as expected.
+* Clicking the pasted-text chip opens the modal showing the exact pasted content, correctly scrollable.
+* Clicking the PDF chip opens the modal with the correct filename as the title; a direct `curl` check of `GET /documents/:id/file` confirmed the backend serves a byte-for-byte identical PDF (1,016,315 bytes, correct `%PDF-1.4` header, `Content-Type: application/pdf`) — the iframe rendered blank in the headless-Chromium screenshot, which is a known headless-mode PDF-plugin limitation, not a bug (a real browser's native PDF viewer renders it fine).
+* Zero console errors, zero failed network requests across both attach-and-view flows.
+
+---
+
+# 🔗 Citations UI Redesign (Phase 5 — Phase 4 of the legal-agent plan, part 1)
+
+---
+
+## 📌 Overview
+
+Citations were a flat list of plain title links. Redesigned into a proper "Sources" block, matching the backend's new dedup/cap (see `server/README.md` Phase 11).
+
+---
+
+## 🔑 What was built
+
+* **`MessageBubble.tsx`** — citations now render under a small uppercase "Sources" label, each as a row with an `ExternalLink` icon, the citation title, and the source domain (via a small `hostnameOf()` helper wrapping `new URL(c.url).hostname`, stripped of a leading `www.`, with a try/catch fallback to the raw URL if parsing fails) shown as a subtitle underneath — closer to how a real research/citation UI reads than a bare link list.
+
+---
+
+## ✅ Result
+
+Verified visually (Playwright screenshot, real chat answer): two distinct real judgment citations rendered cleanly, each with title + `indiankanoon.org` domain subtitle, correctly deduped (no repeat of the same source).
+
+---
+
+# ⚡ Streaming Responses (Phase 6 — Phase 4 of the legal-agent plan, final item)
+
+---
+
+## 📌 Overview
+
+Chat answers now render token-by-token as the backend generates them (see `server/README.md` Phase 12 for the two-call routing/streaming architecture behind this), instead of the client sitting on a "thinking" indicator for the full 5-10s generation time and then getting the whole answer at once.
+
+---
+
+## 🔑 What was built
+
+* **New `services/api.ts` export**: `API_BASE_URL`, so the streaming code (which uses native `fetch`, not axios — see below) doesn't duplicate the base URL literal.
+* **New `features/legal-agent/sse.ts`**: `readSseEvents(response)`, a small async generator that reads a `fetch()` response body's `ReadableStream`, buffers partial chunks, splits on blank-line-delimited SSE frames, and yields parsed JSON events. Native `EventSource` isn't used because it only supports `GET` — this endpoint is a `POST` (it needs to send the message body), so the stream is consumed manually via `fetch` + a `ReadableStream` reader instead, with the auth token attached by hand (read from `localStorage`, mirroring what the axios interceptor does automatically elsewhere).
+* **`useLegalChat.ts::sendMessage`** rewritten around `readSseEvents`: on `user_message` it replaces the optimistic user bubble with the server's persisted version; on the first `delta` it appends a new live assistant message to `messages` and starts growing its `content` on each subsequent delta; on `done` it swaps that live placeholder out for the final persisted message (with real citations, id, etc.); on `error` it toasts. New `streamingMessageId` state tracks which message (if any) is currently receiving tokens.
+* **`ChatWindow.tsx`** — the "thinking" dots bubble now only shows while `sending && !streamingMessageId` (i.e. during the routing-decision wait, before the first token arrives) — once streaming starts, the growing bubble itself is the activity indicator, so showing both at once would have looked like a duplicate/glitch.
+* **`MessageBubble.tsx`** — new `isStreaming` prop: renders a small blinking-cursor bar (a pulsing `span`) right after the markdown content while true, and hides the "Listen" (TTS playback) button until streaming finishes, since playing back partial/incomplete text isn't meaningful.
+
+---
+
+## ✅ Result (verified with Playwright: screenshots taken mid-generation, not just before/after)
+
+* A real "What is anticipatory bail?" question: a screenshot taken ~2.5s after sending still showed the routing-decision "thinking" dots (the extra routing call adds a beat of latency before generation starts); a screenshot ~1.5s later showed real partial prose mid-sentence with the blinking cursor visible — and a direct length comparison between the two screenshots' page text confirmed it **grew** (232 → 427 characters), proving genuine progressive rendering rather than a fake/simulated delay.
+* The clarify path was verified through the same SSE endpoint/client code path: correct instant question + chip options, no streaming artifacts.
+* Zero console errors, zero failed network requests across both paths.
+
+---
+
+# 🎙️ Live Voice Editing (Phase 7)
+
+---
+
+## 📌 Overview
+
+The mic button previously recorded then instantly sent a "voice message" the moment you stopped — no way to see what was heard, fix a misheard word, or add something before it went out. Redesigned around live captions and an explicit review-before-send step: speech now becomes editable draft text in the input box, exactly like typing, before anything is sent to the agent.
+
+---
+
+## 🔑 What was built
+
+* **New `features/legal-agent/speechRecognition.ts`** — isolates the `any`-typed Web Speech API feature detection (`getSpeechRecognitionCtor()`, `isSpeechRecognitionSupported()`); there's no official TS DOM typing for `SpeechRecognition` in this project's lib target, and it's Chrome/Edge/Safari-only (no Firefox support at all).
+* **`ChatInput.tsx` rewritten** around two mutually-exclusive recording paths, chosen once per recording session based on feature detection:
+  - **Live path** (Chrome/Edge/Safari): `SpeechRecognition` with `continuous: true, interimResults: true` — `onresult` accumulates finalized segments in a ref and combines them with the current interim segment to update the textarea's value on every partial result, so text visibly grows as the user speaks. Handles the common browser quirk where recognition auto-stops after a pause even with `continuous: true`, by restarting it from `onend` unless the user explicitly stopped (tracked via a ref, not state, to avoid a stale closure in the event handler).
+  - **Fallback path** (Firefox, or anywhere without the API): the original `MediaRecorder` capture, but instead of calling a "send voice message" callback on stop, the resulting blob is uploaded to the new `POST /speech/transcribe` (server README Phase 13) and the returned text lands in the textarea the same way — a brief "Transcribing…" state (spinner + label) covers the round trip.
+  - Either way, the textarea itself stays visible and shows the growing/final text (`readOnly` only while actively recording or transcribing, to avoid the live updates racing a manual edit) — it does **not** disappear behind a recording indicator like before; a small status row (pulsing dot or spinner + label + timer) sits just above it instead.
+  - **Editing, either way**: typing directly works as soon as recording/transcribing stops (textarea becomes editable again). Clicking the mic again **appends** rather than replaces — whatever was already in the box is preserved as a base and new speech is added after it, so the mic doubles as an "add more by voice" tool during editing, per the request.
+  - **No auto-send**: stopping a recording (or finishing a fallback transcription) only ever populates the text box. The agent is called exactly the same way as a typed message always was — pressing Enter or clicking Send — never automatically. The `onSendVoice` prop and the old auto-send-on-stop callback are gone entirely; voice input is now just another way to fill the same textarea `sendMessage()` already handles.
+* **`useLegalChat.ts` / `LegalAssistant.tsx`** — removed the now-dead `sendVoiceMessage` (nothing calls the old instant-send voice endpoint from the UI anymore; the backend endpoint itself is untouched/still available, just unused by this flow).
+* **`MessageBubble.tsx`** — new **Copy** button (with a Copy→Check icon swap + "Copied" label for ~1.5s) added to every message, both user and assistant, using `navigator.clipboard.writeText()`. Sits alongside the existing "Listen" button for assistant messages.
+
+---
+
+## ✅ Result (verified with Playwright, two full passes — one with the browser's native SpeechRecognition present, one with it explicitly deleted via `context.addInitScript` to force the fallback path)
+
+* **Live path**: mic click shows "Listening…" (not "Recording…") with the pulsing dot + timer; stopping does not create a conversation or send anything (confirmed the conversation rail stayed empty) — the recorded fake-audio-device tone produces no real transcript (expected, headless Chromium has no real microphone/speech to recognize), but the important behavior — no auto-send, textarea returns to editable — was confirmed correctly either way.
+* **Fallback path**: confirmed `window.SpeechRecognition`/`webkitSpeechRecognition` were absent, mic click showed "Recording…" (not "Listening…"), stopping showed "Transcribing…" with a spinner, then returned to an editable box — again, no auto-send, zero network failures, zero console errors.
+* **Copy button**: initial headless run reported "Couldn't copy message" — traced to the automated browser context lacking the `clipboard-write` permission by default, not a code bug. Re-verified with `context.grantPermissions(["clipboard-write"])`: click shows the Copy→Check swap and "Copied" label, and `navigator.clipboard.readText()` afterward returned the exact message text.
+* **Identity check**: "Who are you and how can you help me?" now answers "I am ALDRA AI, an AI legal information assistant specializing in Indian law..." — verified end-to-end through a full streamed response.
+
+---

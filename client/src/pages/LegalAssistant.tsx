@@ -4,6 +4,8 @@ import ConversationSidebar from "../features/legal-agent/ConversationSidebar";
 import ChatWindow from "../features/legal-agent/ChatWindow";
 import ChatInput from "../features/legal-agent/ChatInput";
 import AttachDocumentModal from "../features/legal-agent/AttachDocumentModal";
+import AttachedDocumentsBar from "../features/legal-agent/AttachedDocumentsBar";
+import DocumentViewerModal from "../features/legal-agent/DocumentViewerModal";
 import { useLegalChat } from "../features/legal-agent/useLegalChat";
 
 export default function LegalAssistant() {
@@ -11,18 +13,20 @@ export default function LegalAssistant() {
         conversations,
         activeId,
         messages,
+        attachedDocuments,
         language,
         loadingMessages,
         sending,
+        streamingMessageId,
         selectConversation,
         startNewConversation,
         sendMessage,
-        sendVoiceMessage,
         changeLanguage,
         attachDocument,
     } = useLegalChat();
 
     const [showAttachModal, setShowAttachModal] = useState(false);
+    const [viewingDocumentId, setViewingDocumentId] = useState<number | null>(null);
 
     return (
         <div className="flex h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-white">
@@ -40,14 +44,16 @@ export default function LegalAssistant() {
                     messages={messages}
                     loading={loadingMessages}
                     sending={sending}
+                    streamingMessageId={streamingMessageId}
                     language={language}
                     onSend={sendMessage}
                     onStarterPick={sendMessage}
                 />
 
+                <AttachedDocumentsBar documents={attachedDocuments} onView={setViewingDocumentId} />
+
                 <ChatInput
                     onSend={sendMessage}
-                    onSendVoice={sendVoiceMessage}
                     onAttachClick={() => setShowAttachModal(true)}
                     language={language}
                     onLanguageChange={changeLanguage}
@@ -59,6 +65,13 @@ export default function LegalAssistant() {
                 <AttachDocumentModal
                     onClose={() => setShowAttachModal(false)}
                     onAttached={attachDocument}
+                />
+            )}
+
+            {viewingDocumentId !== null && (
+                <DocumentViewerModal
+                    documentId={viewingDocumentId}
+                    onClose={() => setViewingDocumentId(null)}
                 />
             )}
         </div>

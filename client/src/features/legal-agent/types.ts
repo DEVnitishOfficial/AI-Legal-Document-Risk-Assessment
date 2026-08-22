@@ -17,6 +17,24 @@ export interface Message {
     createdAt: string;
 }
 
+export interface AttachedDocument {
+    id: number;
+    filePath: string | null;
+    content: string | null;
+    status: string;
+    title: string | null;
+    documentType: string | null;
+    createdAt: string;
+}
+
+export interface ConversationDocumentLink {
+    id: number;
+    conversationId: number;
+    documentId: number;
+    createdAt: string;
+    document: AttachedDocument;
+}
+
 export interface Conversation {
     id: number;
     userId: number;
@@ -25,4 +43,5 @@ export interface Conversation {
     createdAt: string;
     updatedAt: string;
     messages?: Message[];
+    documents?: ConversationDocumentLink[];
 }

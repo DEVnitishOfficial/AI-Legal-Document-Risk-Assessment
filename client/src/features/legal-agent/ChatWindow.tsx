@@ -9,6 +9,7 @@ interface ChatWindowProps {
     messages: Message[];
     loading: boolean;
     sending: boolean;
+    streamingMessageId: number | null;
     language: ChatLanguage;
     onSend: (content: string) => void;
     onStarterPick: (prompt: string) => void;
@@ -18,6 +19,7 @@ export default function ChatWindow({
     messages,
     loading,
     sending,
+    streamingMessageId,
     language,
     onSend,
     onStarterPick,
@@ -30,6 +32,9 @@ export default function ChatWindow({
 
     const lastMessage = messages[messages.length - 1];
     const showClarify = !sending && lastMessage?.role === "assistant" && lastMessage.kind === "clarify";
+    // Only show the "thinking" dots before the first token arrives — once
+    // streaming starts, the growing message bubble itself is the indicator.
+    const showThinking = sending && !streamingMessageId;
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
@@ -48,7 +53,7 @@ export default function ChatWindow({
                 ) : (
                     <div className="space-y-4 max-w-3xl mx-auto">
                         {messages.map((m) => (
-                            <MessageBubble key={m.id} message={m} />
+                            <MessageBubble key={m.id} message={m} isStreaming={m.id === streamingMessageId} />
                         ))}
 
                         {showClarify && (
@@ -59,7 +64,7 @@ export default function ChatWindow({
                             />
                         )}
 
-                        {sending && (
+                        {showThinking && (
                             <div className="flex gap-3">
                                 <div className="w-8 h-8 rounded-full bg-purple-600 shrink-0" />
                                 <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-3">

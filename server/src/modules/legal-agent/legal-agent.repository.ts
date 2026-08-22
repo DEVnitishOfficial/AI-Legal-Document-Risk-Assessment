@@ -15,7 +15,10 @@ export const listConversations = async (userId: number) => {
 export const getConversationWithMessages = async (conversationId: number) => {
     return prisma.conversation.findUnique({
         where: { id: conversationId },
-        include: { messages: { orderBy: { createdAt: "asc" } } },
+        include: {
+            messages: { orderBy: { createdAt: "asc" } },
+            documents: { include: { document: true }, orderBy: { createdAt: "asc" } },
+        },
     });
 };
 
@@ -26,7 +29,7 @@ export const appendMessage = async (
         content: string;
         kind?: string;
         clarifyOptions?: Prisma.InputJsonValue;
-        citations?: Prisma.InputJsonValue;
+        citations?: { title: string; url: string }[];
         audioUrl?: string;
     }
 ) => {
@@ -60,6 +63,7 @@ export const linkDocumentToConversation = async (conversationId: number, documen
         where: { conversationId_documentId: { conversationId, documentId } },
         update: {},
         create: { conversationId, documentId },
+        include: { document: true },
     });
 };
 
