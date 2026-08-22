@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import OAuthSuccess from './pages/OAuthSuccess'
 import { Toaster } from 'react-hot-toast'
 import DocumentsPage from './pages/DocumentsPage'
+import LegalAssistant from './pages/LegalAssistant'
 import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchCurrentUser } from './features/auth/authSlice'
@@ -54,6 +55,14 @@ function App () {
           element={
             <ProtectedRoute>
               <DocumentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/legal-assistant'
+          element={
+            <ProtectedRoute>
+              <LegalAssistant />
             </ProtectedRoute>
           }
         />
