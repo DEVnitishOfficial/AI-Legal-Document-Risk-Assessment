@@ -8,8 +8,6 @@ interface CreateUserInput {
 }
 
 export const createUser = async ({ name, email, phone, password }: CreateUserInput) => {
-  console.log("Creating user with values:", { name, email, phone });
-
   return prisma.user.create({
     data: { name, email, phone, password },
   });

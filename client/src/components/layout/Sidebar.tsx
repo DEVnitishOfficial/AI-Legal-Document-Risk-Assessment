@@ -6,6 +6,8 @@ import {
   Menu,
   X,
   Landmark,
+  ShieldCheck,
+  Headset,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../features/auth/authSlice";
@@ -39,15 +41,10 @@ export default function Sidebar() {
   }, []);
 
   const handleLogout = () => {
-    // Navigate away BEFORE clearing the session. logout() removes the token,
-    // and ProtectedRoute redirects to /login the moment it sees no token — if
-    // the protected page is still mounted at that point, that redirect beats
-    // a navigate("/") issued after it. `replace` also stops the Back button
-    // from returning to a protected page that would just bounce to /login.
-    // ProtectedRoute also redirects to "/" once it sees the `loggedOut` flag,
-    // so this navigate and that redirect agree on the destination (previously
-    // the guard's redirect to /login fired last and won). `replace` keeps Back
-    // from returning to a protected page.
+    // logout() clears the token, so ProtectedRoute redirects the moment it
+    // re-renders. It reads the `loggedOut` flag to send people to "/" instead
+    // of /login, so that redirect and this navigate agree on the destination.
+    // `replace` keeps Back from returning to a protected page.
     dispatch(logout());
     toast.success("Logged out successfully!");
     navigate("/", { replace: true });
@@ -57,6 +54,11 @@ export default function Sidebar() {
     { label: "Dashboard", icon: <LayoutDashboard size={17} />, path: "/dashboard" },
     { label: "Documents", icon: <FileText size={17} />, path: "/documents" },
     { label: "Legal Assistant", icon: <Scale size={17} />, path: "/legal-assistant" },
+    { label: "Connect Advocate", icon: <Headset size={17} />, path: "/connect-advocate" },
+    // Shown only to admins; the server re-checks the role on every admin call.
+    ...(user?.role === "ADMIN"
+      ? [{ label: "Admin", icon: <ShieldCheck size={17} />, path: "/admin/advocates" }]
+      : []),
   ];
 
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
@@ -108,7 +110,8 @@ export default function Sidebar() {
         {/* 🔹 Nav */}
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            // Sub-pages (e.g. /connect-advocate/session/3) keep their section highlighted.
+            const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
 
             return (
               <button

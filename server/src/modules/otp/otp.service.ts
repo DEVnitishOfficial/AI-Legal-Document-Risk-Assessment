@@ -6,6 +6,7 @@ import { AppError } from "../../common/errors/AppError";
 import { generateToken } from "../../common/utils/jwt";
 import { sendOtpSms } from "./otp.sms";
 import { env } from "../../config/env";
+import { toSafeUser } from "../user/user.mapper";
 
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -71,5 +72,5 @@ export const verifyOtp = async (phone: string, code: string) => {
 
   const token = generateToken({ id: user.id, email: user.email });
 
-  return { user, token };
+  return { user: toSafeUser(user), token };
 };

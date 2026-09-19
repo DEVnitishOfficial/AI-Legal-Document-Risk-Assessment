@@ -1,16 +1,14 @@
 import { Request, Response, NextFunction } from "express";
-import { env } from "../../config/env";
-import { AppError } from "../../common/errors/AppError";
 import { crawlAndIngest, ingestFromQueries } from "./rag.ingest";
-import { countChunks } from "./rag.repository";
+import { countChunks, summariseStatutes } from "./rag.repository";
+import { ingestStatutes } from "./rag.statute-ingest";
+import { STATUTE_SOURCES } from "./rag.sources";
+import { syncAiKnowledgeCredentials } from "../advocate/advocate.service";
 
 export const runIngest = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const secret = req.headers["x-ingest-secret"];
-
-        if (!secret || secret !== env.RAG_INGEST_SECRET) {
-            throw new AppError("Not authorized to trigger ingestion", 403);
-        }
+        // Access is enforced by the route (requireAdmin) — this used to be a
+        // shared x-ingest-secret header, before the platform had an admin role.
 
         // Explicit URLs take priority (deliberate sources); otherwise search
         // for real content by query, falling back to the default seed
@@ -34,6 +32,42 @@ export const getIngestStatus = async (_req: Request, res: Response, next: NextFu
     try {
         const totalChunks = await countChunks();
         res.json({ success: true, data: { totalChunks } });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Official-statute ingestion (admin). Downloads the registered gazette PDFs,
+// which costs OpenAI embedding credits but no Firecrawl credits.
+export const runStatuteIngest = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const acts = Array.isArray(req.body?.acts)
+            ? req.body.acts.filter((a: unknown): a is string => typeof a === "string")
+            : undefined;
+
+        const results = await ingestStatutes(acts);
+        if (results.some((r) => r.ok)) await syncAiKnowledgeCredentials(await summariseStatutes());
+
+        res.json({ success: true, data: { results } });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getStatuteStatus = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json({
+            success: true,
+            data: {
+                loaded: await summariseStatutes(),
+                registered: STATUTE_SOURCES.map(({ actShort, actName, expectedSections, url }) => ({
+                    actShort,
+                    actName,
+                    expectedSections,
+                    url,
+                })),
+            },
+        });
     } catch (err) {
         next(err);
     }

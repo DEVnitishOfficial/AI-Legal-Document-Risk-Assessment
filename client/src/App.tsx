@@ -4,11 +4,17 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import './App.css'
 import ProtectedRoute from './routes/ProtectedRoute'
+import AdminRoute from './routes/AdminRoute'
+import AdvocatesAdminPage from './pages/admin/AdvocatesAdminPage'
 import Dashboard from './pages/Dashboard'
 import OAuthSuccess from './pages/OAuthSuccess'
 import { Toaster } from 'react-hot-toast'
 import DocumentsPage from './pages/DocumentsPage'
 import LegalAssistant from './pages/LegalAssistant'
+import ConnectAdvocatePage from './pages/ConnectAdvocatePage'
+import JoinConsultationPage from './pages/JoinConsultationPage'
+import ConsultationRoomPage from './pages/ConsultationRoomPage'
+import ConsultationHistoryPage from './pages/ConsultationHistoryPage'
 import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchCurrentUser } from './features/auth/authSlice'
@@ -64,6 +70,46 @@ function App () {
             <ProtectedRoute>
               <LegalAssistant />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/connect-advocate'
+          element={
+            <ProtectedRoute>
+              <ConnectAdvocatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/connect-advocate/join/:slug'
+          element={
+            <ProtectedRoute>
+              <JoinConsultationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/connect-advocate/session/:id'
+          element={
+            <ProtectedRoute>
+              <ConsultationRoomPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/connect-advocate/history'
+          element={
+            <ProtectedRoute>
+              <ConsultationHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/admin/advocates'
+          element={
+            <AdminRoute>
+              <AdvocatesAdminPage />
+            </AdminRoute>
           }
         />
       </Routes>

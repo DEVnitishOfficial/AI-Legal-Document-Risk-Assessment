@@ -19,7 +19,6 @@ try {
           const email = profile.emails?.[0]?.value;
           const name = profile.displayName;
           const profilePicture = profile.photos?.[0]?.value;
-          console.log("Google profile:", profile);
 
           if (!email) {
             return done(new Error("No email found in Google profile"), undefined);
@@ -27,7 +26,6 @@ try {
 
           //1. Find user
           let user = await userRepo.findUserByEmail(email);
-          console.log("User found in DB:", user);
 
           //2. If not found → create user
           if (!user) {
@@ -38,14 +36,12 @@ try {
               password: "GOOGLE_AUTH_USER",
             });
           }
-          console.log("User created or found:", user);
 
           //3. Generate JWT
           const token = generateToken({
             id: user.id,
             email: user.email,
           });
-          console.log("Generated JWT token:", token);
 
           //pass both user + token forward
           return done(null, { user, token } as unknown as Express.User);

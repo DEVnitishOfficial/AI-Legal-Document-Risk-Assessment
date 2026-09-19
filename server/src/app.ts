@@ -4,6 +4,7 @@ import passport from "passport";
 import { errorHandler } from "./common/middleware/error.middleware";
 import routes from "./routes";
 import { env } from "./config/env";
+import { PHOTO_DIR } from "./modules/advocate/advocate.service";
 
 const app = express();
 
@@ -13,6 +14,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(passport.initialize());
+// Only the advocate-photos directory is public. The rest of uploads/ (client
+// documents, voice recordings) is never served statically.
+app.use("/uploads/advocates", express.static(PHOTO_DIR, { maxAge: "1h", index: false }));
 console.log("Express app initialized with CORS and JSON parsing");
 app.use("/api/v1", routes);
 app.use(errorHandler);

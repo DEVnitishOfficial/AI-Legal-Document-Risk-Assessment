@@ -17,6 +17,17 @@ export const embedText = async (text: string): Promise<number[]> => {
     return response.data[0].embedding;
 };
 
+// Batched variant for bulk ingestion — one API call per batch instead of per
+// chunk. Results come back in input order.
+export const embedTexts = async (texts: string[]): Promise<number[][]> => {
+    const response = await client.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: texts.map((t) => t.slice(0, 8000)),
+    });
+
+    return response.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+};
+
 export const hashContent = (content: string): string =>
     crypto.createHash("sha256").update(content).digest("hex");
 

@@ -2,6 +2,7 @@ import * as userRepo from "./user.repository";
 import { AppError } from "../../common/errors/AppError";
 import bcrypt from "bcrypt";
 import { generateToken } from "../../common/utils/jwt";
+import { toSafeUser } from "./user.mapper";
 
 
 export const registerUser = async (data: any) => {
@@ -21,12 +22,14 @@ export const registerUser = async (data: any) => {
   // Hash the password before saving
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  return userRepo.createUser({
+  const user = await userRepo.createUser({
     name: data.name,
     email: data.email,
     phone: data.phone,
     password: hashedPassword,
   });
+
+  return toSafeUser(user);
 };
 
 
@@ -46,7 +49,7 @@ export const loginUser = async (email: string, password: string) => {
   const token = generateToken({ id: user.id, email: user.email });
 
   return {
-    user,
+    user: toSafeUser(user),
     token,
   };
 };
@@ -58,6 +61,5 @@ export const getCurrentUser = async (id: number) => {
     throw new AppError("User not found", 404);
   }
 
-  const { password, ...safeUser } = user;
-  return safeUser;
+  return toSafeUser(user);
 };

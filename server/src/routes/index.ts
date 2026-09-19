@@ -8,6 +8,8 @@ import speechRoutes from "../modules/speech/speech.routes";
 import "../common/middleware/auth.google";
 import authRoutes from "../modules/auth/auth.routes";
 import otpRoutes from "../modules/otp/otp.routes";
+import { advocateRoutes, adminAdvocateRoutes } from "../modules/advocate/advocate.routes";
+import consultationRoutes from "../modules/consultation/consultation.routes";
 
 
 const router = Router();
@@ -26,5 +28,8 @@ router.use("/rag", ragRoutes);
 router.use("/speech", speechRoutes);
 router.use("/auth", authRoutes)
 router.use("/auth/otp", otpRoutes)
+router.use("/advocates", advocateRoutes)
+router.use("/admin/advocates", adminAdvocateRoutes)
+router.use("/consultations", consultationRoutes)
 
 export default router;
