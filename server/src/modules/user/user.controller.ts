@@ -20,10 +20,8 @@ export const register = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("Register endpoint hit with data:", req.body);
   try {
     const user = await userService.registerUser(req.body);
-    console.log("Registered user:", user);
 
     res.status(201).json({
       success: true,

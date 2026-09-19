@@ -18,4 +18,13 @@ export const env = {
   SERVER_URL: process.env.SERVER_URL || "http://localhost:3000",
   MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY || "",
   MSG91_TEMPLATE_ID: process.env.MSG91_TEMPLATE_ID || "",
+  // Live voice consultations are billed per audio minute: each user gets this
+  // many minutes per rolling 24 hours.
+  DAILY_CONSULT_MINUTES: Math.max(1, Number(process.env.DAILY_CONSULT_MINUTES) || 30),
+  // Comma-separated account emails promoted to ADMIN at server start. Additive
+  // only: removing an email here does not demote — change the role in the DB.
+  ADMIN_EMAILS: (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
 };

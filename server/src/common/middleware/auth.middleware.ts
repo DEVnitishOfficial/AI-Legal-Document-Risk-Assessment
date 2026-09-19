@@ -3,30 +3,22 @@ import jwt from "jsonwebtoken";
 import { env } from "../../config/env";
 import { AppError } from "../errors/AppError";
 
-// interface AuthRequest extends Request {
-//   user?: User; 
-// }
-
+// Verifies the JWT and attaches its payload as req.user. Deliberately logs
+// nothing about the request: the Authorization header and token are secrets.
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log("Authorization header:", authHeader);
 
     if (!authHeader) {
       throw new AppError("Unauthorized request", 401);
     }
 
     const token = authHeader.split(" ")[1];
-
     const decodedToken = jwt.verify(token, env.JWT_SECRET);
 
-    console.log("Decoded token in auth middleware:", decodedToken);
-
     req.user = decodedToken as unknown as Express.User;
-    console.log('Auth middleware completed successfully');
     next();
   } catch (err) {
-    console.error('Error in auth middleware:', err);
-    next(new AppError("Invalid token", 401));
+    next(err instanceof AppError ? err : new AppError("Invalid token", 401));
   }
 };
