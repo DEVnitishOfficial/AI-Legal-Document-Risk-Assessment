@@ -38,7 +38,7 @@ export default function ChatWindow({
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex items-center gap-2 px-4 py-2 text-xs text-amber-800 bg-amber-50 border-b border-amber-200 dark:text-amber-200 dark:bg-amber-950/40 dark:border-amber-900">
+            <div className="flex items-center gap-2 px-4 py-2 text-xs text-risk-med-fg bg-risk-med-bg border-b border-cream-200 dark:text-risk-med-fg-dark dark:bg-risk-med-bg-dark dark:border-white/10">
                 <AlertTriangle size={14} className="shrink-0" />
                 <span>
                     {language === "hi"
@@ -66,12 +66,12 @@ export default function ChatWindow({
 
                         {showThinking && (
                             <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-full bg-purple-600 shrink-0" />
-                                <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-3">
+                                <div className="w-8 h-8 rounded-full bg-navy-950 dark:bg-gold-500 shrink-0" />
+                                <div className="bg-navy-950 dark:bg-navy-800 rounded-2xl rounded-tl-sm px-4 py-3">
                                     <span className="flex gap-1">
-                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" />
+                                        <span className="w-1.5 h-1.5 bg-cream-100/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                        <span className="w-1.5 h-1.5 bg-cream-100/50 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                        <span className="w-1.5 h-1.5 bg-cream-100/50 rounded-full animate-bounce" />
                                     </span>
                                 </div>
                             </div>

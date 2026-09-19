@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import AuthShell from "../features/auth/AuthShell";
 import CaseFileCard from "../features/auth/CaseFileCard";
 import AuthField from "../features/auth/AuthField";
+import { API_BASE_URL } from "../services/api";
 
 export default function Register() {
     const navigate = useNavigate();
@@ -40,7 +41,12 @@ export default function Register() {
             setError(null);
 
             await dispatch(
-                registerUser({ name: form.name, email: form.email, password: form.password })
+                registerUser({
+                    name: form.name,
+                    email: form.email,
+                    phone: form.phone || undefined,
+                    password: form.password,
+                })
             ).unwrap();
 
             toast.success("Account created — please sign in.");
@@ -184,7 +190,7 @@ export default function Register() {
                 </div>
 
                 <button
-                    onClick={() => (window.location.href = "http://localhost:3000/api/v1/auth/google")}
+                    onClick={() => (window.location.href = `${API_BASE_URL}/auth/google`)}
                     disabled={isLoading}
                     className="w-full bg-white hover:bg-cream-50 text-navy-900 py-3 rounded-lg font-semibold border border-cream-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mb-5"
                 >

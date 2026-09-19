@@ -5,8 +5,9 @@ import {
   LogOut,
   Menu,
   X,
+  Landmark,
 } from "lucide-react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../features/auth/authSlice";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -17,6 +18,7 @@ export default function Sidebar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const user = useSelector((state: any) => state.auth.user);
 
   const [isOpen, setIsOpen] = useState(() => {
     return localStorage.getItem("sidebarOpen") === "true";
@@ -37,23 +39,34 @@ export default function Sidebar() {
   }, []);
 
   const handleLogout = () => {
+    // Navigate away BEFORE clearing the session. logout() removes the token,
+    // and ProtectedRoute redirects to /login the moment it sees no token — if
+    // the protected page is still mounted at that point, that redirect beats
+    // a navigate("/") issued after it. `replace` also stops the Back button
+    // from returning to a protected page that would just bounce to /login.
+    // ProtectedRoute also redirects to "/" once it sees the `loggedOut` flag,
+    // so this navigate and that redirect agree on the destination (previously
+    // the guard's redirect to /login fired last and won). `replace` keeps Back
+    // from returning to a protected page.
     dispatch(logout());
     toast.success("Logged out successfully!");
-    navigate("/login");
+    navigate("/", { replace: true });
   };
 
   const navItems = [
-    { label: "Dashboard", icon: <LayoutDashboard />, path: "/dashboard" },
-    { label: "Documents", icon: <FileText />, path: "/documents" },
-    { label: "Legal Assistant", icon: <Scale />, path: "/legal-assistant" },
+    { label: "Dashboard", icon: <LayoutDashboard size={17} />, path: "/dashboard" },
+    { label: "Documents", icon: <FileText size={17} />, path: "/documents" },
+    { label: "Legal Assistant", icon: <Scale size={17} />, path: "/legal-assistant" },
   ];
+
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
 
   return (
     <>
       {/* 🔹 Mobile Hamburger */}
       <button
         onClick={() => setIsOpen(true)}
-        className="md:hidden p-2 m-3 rounded-lg bg-white text-gray-900 dark:bg-gray-900 dark:text-white fixed top-0 left-0 z-50 border border-gray-200 dark:border-transparent"
+        className="md:hidden p-2 m-3 rounded-lg bg-navy-950 text-cream-50 fixed top-0 left-0 z-50 border border-white/10"
       >
         <Menu size={22} />
       </button>
@@ -69,64 +82,74 @@ export default function Sidebar() {
       {/* 🔹 Sidebar */}
       <div
         className={`
-        fixed md:static top-0 left-0 h-full w-64 bg-white text-gray-900 border-r border-gray-200 dark:bg-gray-900 dark:text-white dark:border-transparent p-5 flex flex-col justify-between z-50
+        fixed md:static top-0 left-0 h-full w-64 bg-navy-950 text-cream-100 p-4 flex flex-col z-50
         transform transition-transform duration-300
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
         md:translate-x-0
       `}
       >
-        {/* 🔹 Top */}
-        <div>
-          {/* Header */}
-          <div className="flex items-center justify-between mb-10">
-            <h1 className="text-xl font-bold">NyayMitra AI</h1>
-
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-
-              {/* Close (mobile only) */}
-              <button
-                onClick={() => setIsOpen(false)}
-                className="md:hidden"
-              >
-                <X className="cursor-pointer" />
-              </button>
-            </div>
+        {/* 🔹 Header */}
+        <div className="flex items-center justify-between px-2 mb-8">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-full border border-dashed border-gold-500 flex items-center justify-center text-gold-400">
+              <Landmark size={15} />
+            </span>
+            <span className="font-display text-[15px] font-medium text-white">NyayMitra AI</span>
           </div>
 
-          {/* Nav */}
-          <nav className="space-y-2">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-
-              return (
-                <div
-                  key={item.label}
-                  onClick={() => navigate(item.path)}
-                  className={`
-                    flex items-center gap-3 p-2 rounded-lg cursor-pointer transition
-                    ${
-                      isActive
-                        ? "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white"
-                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-                    }
-                  `}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </div>
-              );
-            })}
-          </nav>
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="!bg-transparent !text-cream-100/60 hover:!bg-white/10" />
+            <button onClick={() => setIsOpen(false)} className="md:hidden text-cream-100/60">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* 🔹 Bottom */}
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-600 transition"
-        >
-          <LogOut size={18} /> Logout
-        </button>
+        {/* 🔹 Nav */}
+        <nav className="flex flex-col gap-1 flex-1">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+
+            return (
+              <button
+                key={item.label}
+                onClick={() => {
+                  navigate(item.path);
+                  setIsOpen(false);
+                }}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium text-left border-l-2 transition-colors
+                  ${
+                    isActive
+                      ? "bg-gold-500/10 text-white border-gold-500"
+                      : "text-cream-100/55 border-transparent hover:text-white hover:bg-white/5"
+                  }
+                `}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* 🔹 User card */}
+        <div className="flex items-center gap-2.5 pt-4 border-t border-white/10 px-1">
+          <div className="w-8 h-8 rounded-full bg-gold-500 text-navy-950 font-bold text-[13px] flex items-center justify-center border-2 border-gold-400 shrink-0">
+            {userInitial}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-white truncate">{user?.name || "User"}</p>
+            <p className="text-[11px] text-cream-100/40">Welcome back</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            className="text-[#e0a09a] hover:text-[#f0bdb8] transition-colors shrink-0 p-1"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
       </div>
     </>
   );

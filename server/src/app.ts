@@ -3,11 +3,12 @@ import cors from "cors";
 import passport from "passport";
 import { errorHandler } from "./common/middleware/error.middleware";
 import routes from "./routes";
+import { env } from "./config/env";
 
 const app = express();
 
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000"],
+  origin: [env.CLIENT_URL, env.SERVER_URL],
   credentials: true
 }));
 app.use(express.json());

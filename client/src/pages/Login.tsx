@@ -1,5 +1,5 @@
 import { useDispatch } from "react-redux";
-import { loginUser } from "../features/auth/authSlice";
+import { loginUser, sendOtp, verifyOtp } from "../features/auth/authSlice";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,7 @@ import AuthShell from "../features/auth/AuthShell";
 import CaseFileCard from "../features/auth/CaseFileCard";
 import AuthTabs, { type AuthMethod } from "../features/auth/AuthTabs";
 import AuthField from "../features/auth/AuthField";
+import { API_BASE_URL } from "../services/api";
 
 export default function Login() {
     const dispatch = useDispatch<any>();
@@ -16,6 +17,8 @@ export default function Login() {
     const [method, setMethod] = useState<AuthMethod>("email");
     const [form, setForm] = useState({ email: "", password: "" });
     const [phone, setPhone] = useState("");
+    const [otpStep, setOtpStep] = useState<"phone" | "code">("phone");
+    const [otpCode, setOtpCode] = useState("");
     const [keepSignedIn, setKeepSignedIn] = useState(true);
 
     const [isLoading, setIsLoading] = useState(false);
@@ -41,12 +44,50 @@ export default function Login() {
         }
     };
 
-    const handlePhoneSubmit = () => {
+    const handlePhoneSubmit = async () => {
         if (!phone.trim()) {
             toast.error("Enter your mobile number first");
             return;
         }
-        toast("Mobile OTP sign-in is coming soon — use email for now.", { icon: "🚧" });
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const result = await dispatch(sendOtp({ phone })).unwrap();
+
+            const devCode = result?.data?.devCode;
+            if (devCode) {
+                toast.success(`Dev mode — OTP is ${devCode}`, { duration: 8000 });
+            } else {
+                toast.success("OTP sent to your mobile number.");
+            }
+            setOtpStep("code");
+        } catch (err: any) {
+            setError(err?.response?.data?.message || err?.message || "Failed to send OTP. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleOtpVerify = async () => {
+        if (!otpCode.trim()) {
+            toast.error("Enter the OTP you received");
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            await dispatch(verifyOtp({ phone, code: otpCode })).unwrap();
+
+            toast.success("Login successful!");
+            navigate("/dashboard");
+        } catch (err: any) {
+            setError(err?.response?.data?.message || err?.message || "Invalid or expired OTP. Please try again.");
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -138,21 +179,53 @@ export default function Login() {
                             )}
                         </button>
                     </>
-                ) : (
+                ) : otpStep === "phone" ? (
                     <>
                         <AuthField
                             label="Mobile number"
                             type="tel"
                             value={phone}
+                            disabled={isLoading}
                             placeholder="+91 98765 43210"
                             autoComplete="tel"
                             onChange={setPhone}
                         />
                         <button
                             onClick={handlePhoneSubmit}
-                            className="w-full bg-navy-900 hover:bg-navy-800 dark:bg-gold-500 dark:hover:bg-gold-400 text-cream-50 dark:text-navy-950 active:scale-[0.98] py-3 rounded-lg mb-5 font-semibold transition-all"
+                            disabled={isLoading}
+                            className="w-full bg-navy-900 hover:bg-navy-800 dark:bg-gold-500 dark:hover:bg-gold-400 text-cream-50 dark:text-navy-950 active:scale-[0.98] py-3 rounded-lg mb-5 font-semibold transition-all disabled:opacity-50 disabled:pointer-events-none"
                         >
-                            Send OTP
+                            {isLoading ? "Sending..." : "Send OTP"}
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <AuthField
+                            label="Enter OTP"
+                            type="text"
+                            value={otpCode}
+                            disabled={isLoading}
+                            placeholder="6-digit code"
+                            autoComplete="one-time-code"
+                            onChange={setOtpCode}
+                        />
+                        <button
+                            onClick={handleOtpVerify}
+                            disabled={isLoading}
+                            className="w-full bg-navy-900 hover:bg-navy-800 dark:bg-gold-500 dark:hover:bg-gold-400 text-cream-50 dark:text-navy-950 active:scale-[0.98] py-3 rounded-lg mb-3 font-semibold transition-all disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                            {isLoading ? "Verifying..." : "Verify & sign in"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOtpStep("phone");
+                                setOtpCode("");
+                                setError(null);
+                            }}
+                            className="w-full text-sm text-gold-600 dark:text-gold-400 hover:underline mb-5"
+                        >
+                            Change number
                         </button>
                     </>
                 )}
@@ -174,7 +247,7 @@ export default function Login() {
                 </div>
 
                 <button
-                    onClick={() => (window.location.href = "http://localhost:3000/api/v1/auth/google")}
+                    onClick={() => (window.location.href = `${API_BASE_URL}/auth/google`)}
                     disabled={isLoading}
                     className="w-full bg-white hover:bg-cream-50 text-navy-900 py-3 rounded-lg font-semibold border border-cream-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mb-6"
                 >

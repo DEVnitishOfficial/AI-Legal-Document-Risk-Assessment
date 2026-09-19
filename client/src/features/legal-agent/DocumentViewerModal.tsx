@@ -58,15 +58,15 @@ export default function DocumentViewerModal({ documentId, onClose }: DocumentVie
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-4xl h-[85vh] flex flex-col text-gray-900 dark:text-white overflow-hidden"
+                className="bg-white dark:bg-navy-900 border border-cream-200 dark:border-white/10 rounded-xl w-full max-w-4xl h-[85vh] flex flex-col text-navy-950 dark:text-cream-50 overflow-hidden"
             >
-                <div className="flex justify-between items-center px-5 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
-                    <h3 className="font-semibold truncate pr-4">
+                <div className="flex justify-between items-center px-5 py-3 border-b border-cream-200 dark:border-white/10 shrink-0">
+                    <h3 className="font-display font-medium truncate pr-4">
                         {doc?.title || doc?.filePath?.split(/[\\/]/).pop() || "Document"}
                     </h3>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+                        className="p-1 rounded hover:bg-cream-100 dark:hover:bg-navy-800 shrink-0 text-gray-400 dark:text-cream-100/50"
                     >
                         <X size={18} />
                     </button>
@@ -74,13 +74,13 @@ export default function DocumentViewerModal({ documentId, onClose }: DocumentVie
 
                 <div className="flex-1 min-h-0 overflow-hidden">
                     {loading ? (
-                        <div className="h-full flex items-center justify-center text-gray-400">
+                        <div className="h-full flex items-center justify-center text-gray-400 dark:text-cream-100/40">
                             <Loader2 size={24} className="animate-spin" />
                         </div>
                     ) : fileUrl ? (
                         <iframe src={fileUrl} title="Document preview" className="w-full h-full border-0" />
                     ) : (
-                        <pre className="h-full overflow-y-auto p-5 text-sm whitespace-pre-wrap font-sans text-gray-700 dark:text-gray-300">
+                        <pre className="h-full overflow-y-auto p-5 text-sm whitespace-pre-wrap font-sans text-gray-600 dark:text-cream-100/60">
                             {textContent}
                         </pre>
                     )}

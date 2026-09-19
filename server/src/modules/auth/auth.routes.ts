@@ -1,5 +1,6 @@
 import { Router } from "express";
 import passport from "passport";
+import { env } from "../../config/env";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get("/google/callback", (req, res, next) => {
     }
 
     const { token } = user;
-    res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    res.redirect(`${env.CLIENT_URL}/oauth-success?token=${token}`);
   })(req, res, next);
 });
 

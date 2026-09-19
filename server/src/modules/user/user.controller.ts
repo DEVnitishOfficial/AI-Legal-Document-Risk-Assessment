@@ -31,12 +31,7 @@ export const register = async (
       data: user,
     });
   } catch (err) {
-    console.error("Registration Error:", err); // ADD THIS LINE
-    res.status(500).json({
-      success: false,
-      message: "Error registering user",
-      data: null,
-    });
+    next(err);
   }
 };
 

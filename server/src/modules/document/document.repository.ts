@@ -26,6 +26,9 @@ export const getUserDocuments = async (userId: number) => {
   return prisma.document.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
+    // Only the risk summary — the Documents grid shows a verdict chip per
+    // card without needing the full analysis payload.
+    include: { analysis: { select: { riskLevel: true, riskScore: true } } },
   });
 };
 
