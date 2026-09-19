@@ -7,6 +7,7 @@ import {
   X,
   Landmark,
   ShieldCheck,
+  Headset,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../features/auth/authSlice";
@@ -53,6 +54,7 @@ export default function Sidebar() {
     { label: "Dashboard", icon: <LayoutDashboard size={17} />, path: "/dashboard" },
     { label: "Documents", icon: <FileText size={17} />, path: "/documents" },
     { label: "Legal Assistant", icon: <Scale size={17} />, path: "/legal-assistant" },
+    { label: "Connect Advocate", icon: <Headset size={17} />, path: "/connect-advocate" },
     // Shown only to admins; the server re-checks the role on every admin call.
     ...(user?.role === "ADMIN"
       ? [{ label: "Admin", icon: <ShieldCheck size={17} />, path: "/admin/advocates" }]
@@ -108,7 +110,8 @@ export default function Sidebar() {
         {/* 🔹 Nav */}
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            // Sub-pages (e.g. /connect-advocate/session/3) keep their section highlighted.
+            const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
 
             return (
               <button
