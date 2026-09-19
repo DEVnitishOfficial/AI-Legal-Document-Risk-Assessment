@@ -21,7 +21,7 @@ export const transcribeAudio = async (filePath: string, language?: "en" | "hi"):
 export const synthesizeSpeech = async (text: string): Promise<Buffer> => {
     const response = await client.audio.speech.create({
         model: "tts-1",
-        voice: "alloy",
+        voice: "shimmer",
         input: text.slice(0, 4000),
     });
 

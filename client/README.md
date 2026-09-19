@@ -438,3 +438,35 @@ The mic button previously recorded then instantly sent a "voice message" the mom
 * **Identity check**: "Who are you and how can you help me?" now answers "I am ALDRA AI, an AI legal information assistant specializing in Indian law..." — verified end-to-end through a full streamed response.
 
 ---
+
+# ⚖️ Rebrand to NyayMitra AI + Editorial Login/Register Redesign (Phase 8)
+
+---
+
+## 📌 Overview
+
+Two things: (1) app-wide rename from the placeholder "LegalAI" (and the chat agent's just-set "ALDRA AI") to a single consistent brand, **NyayMitra AI**, across the sidebar, home page, browser tab title, and the agent's own self-identification; (2) a full visual redesign of the Login and Register pages from the original plain purple/gray cards to a premium "legal case file" editorial look — navy + gold + cream, serif display type, split-screen layout — built from two reference mockups the user provided, with added motion so it doesn't feel static, and full light/dark mode support. UI-only for now: a "Mobile OTP" tab is visually present (per the reference) but not wired to a real backend yet — phone-based auth is explicitly deferred to a follow-up.
+
+---
+
+## 🔑 What was built
+
+* **Rename**: `Sidebar.tsx`, `Home.tsx` ("LegalAI" → "NyayMitra AI"), `index.html`'s `<title>` (was literally "client", now "NyayMitra AI"), and `server/src/modules/legal-agent/legal-agent.prompt.ts`'s shared persona block (ALDRA AI → NyayMitra AI, see server README Phase 14).
+* **New design tokens** (`App.css`, Tailwind v4 `@theme` block): a small custom palette — `navy-*`, `gold-*`, `cream-*`, `maroon-*` — plus `font-display` (Fraunces, an editorial serif loaded via Google Fonts in `index.html`) and `font-body` (Inter). Scoped as reusable theme tokens rather than one-off hex values so the look can extend to other pages later without redefining colors.
+* **New `features/auth/` component set**, shared by both pages:
+  - `AuthShell.tsx` — the split-screen shell: a navy left branding panel (hidden below `lg:`, form stays centered on mobile) with a slowly-rotating dashed ring around a `Landmark` icon, a staggered-entrance headline/subtitle/feature list, ambient drifting gradient blobs for background motion, and a small rotating "People are asking about: {use case}" ticker (cycles through real product use-cases like "rental agreements" / "FIR copies" — a dynamism/curiosity touch that doesn't fabricate fake stats) — plus the right-side form slot.
+  - `FeatureList.tsx` — the numbered (01–04) capability list with a framer-motion stagger-in.
+  - `CaseFileCard.tsx` — the form card itself: a small maroon "ribbon" tab in the corner, a monospace file-number tag (e.g. "FILE NO. 2026/NM-0472" on Login, "NEW FILE — AWAITING DETAILS" on Register), scale/fade entrance.
+  - `AuthTabs.tsx` — Email / Mobile OTP switcher with a `layoutId`-based sliding pill background.
+  - `AuthField.tsx` — shared labeled input, with a "Show/Hide" toggle for password fields instead of a plain type-toggle icon, matching the reference's editorial label style.
+* **`Login.tsx` rewritten** on top of these: email/password sign-in (existing `loginUser` thunk, unchanged logic — just restyled), a Mobile OTP tab that collects a phone number but submits to a toast ("coming soon") rather than a real endpoint, "Keep me signed in" checkbox and "Forgot password?" link (both UI-only for now, same honest "coming soon" toast pattern rather than a silently dead control), Google OAuth button (unchanged, still real).
+* **`Register.tsx` rewritten**, and in the process a **real pre-existing bug was fixed**: the original page dispatched `registerUser` without `await`/`.unwrap()` and without any error handling — it always showed a success toast and navigated to `/login` regardless of whether registration actually succeeded (e.g. a duplicate email would silently fail while still telling the user it worked). Now properly awaits the thunk, validates client-side first (required fields, password match, 8-char minimum, terms-checkbox agreement), and surfaces real backend errors (`err?.response?.data?.message`, e.g. "User already exists") in the same animated error box as Login. Added a mobile-number field (UI-only, not yet sent anywhere) and a Terms/Privacy-Policy agreement checkbox (links show a "coming soon" toast — no such pages exist yet).
+
+---
+
+## ✅ Result (verified with Playwright — visual pass across light/dark/mobile, plus a full functional pass exercising real validation and the actual register → login → dashboard flow)
+
+* Visual: both pages screenshotted in light mode, dark mode, the Mobile OTP tab state, and a 390px-wide mobile viewport — matches the reference's structure closely, dark mode reflows correctly (gold accents keep working on the darker card), mobile correctly collapses the branding panel and stacks the form full-width. Zero console errors across every state.
+* Functional: submitting mismatched passwords shows "Passwords don't match." inline (form data preserved, not cleared); submitting without checking the terms box shows the agreement-required error; fixing both and submitting for real creates the account, redirects to `/login`, and logging in with the new credentials correctly reaches `/dashboard` — confirming the rewritten Register flow (and its bug fix) works end-to-end, not just visually.
+
+---

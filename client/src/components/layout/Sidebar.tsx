@@ -79,7 +79,7 @@ export default function Sidebar() {
         <div>
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
-            <h1 className="text-xl font-bold">LegalAI</h1>
+            <h1 className="text-xl font-bold">NyayMitra AI</h1>
 
             <div className="flex items-center gap-2">
               <ThemeToggle />

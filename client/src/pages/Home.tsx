@@ -7,7 +7,7 @@ export default function Home() {
     <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-white flex flex-col">
       {/* Navbar */}
       <div className="flex justify-between items-center px-10 py-5">
-        <h1 className="text-xl font-bold">LegalAI</h1>
+        <h1 className="text-xl font-bold">NyayMitra AI</h1>
         <div className="flex items-center space-x-4">
           <Link to="/login" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
             Login

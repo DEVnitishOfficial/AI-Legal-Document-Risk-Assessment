@@ -1155,3 +1155,25 @@ Two changes: (1) a standalone transcription endpoint to support a redesigned mic
 * `/speech/transcribe` verified as part of the client-side fallback flow (see client README) — correctly returns transcript text without creating any conversation activity.
 
 ---
+
+# ⚖️ Rebrand: ALDRA AI → NyayMitra AI (Phase 14)
+
+---
+
+## 📌 Overview
+
+Same-day follow-up: the user decided on a single app-wide brand name, **NyayMitra AI**, superseding the "ALDRA AI" identity set in Phase 13 (which itself only lived for one turn). Full rationale and the matching frontend rebrand + login/register redesign are in `client/README.md` Phase 8.
+
+---
+
+## 🔑 What was built
+
+* **`legal-agent.prompt.ts::PERSONA_AND_KNOWLEDGE`** — the "You are ALDRA AI..." identity line updated to "You are NyayMitra AI...", same instruction to self-identify by name when asked, same shared block feeding all three prompt variants (voice, streaming-answer, clarify-routing).
+
+---
+
+## ✅ Result
+
+Verified directly via a real streamed `curl` request (fresh test user, real conversation, real OpenAI call) — "Who are you?" now answers "I am NyayMitra AI, an AI legal information assistant specialized in Indian law..." with the capability description unchanged.
+
+---
