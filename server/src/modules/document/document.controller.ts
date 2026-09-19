@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Request, Response, NextFunction } from "express";
-import { createTextDoc, uploadDocument } from "./document.service";
+import { createTextDoc, uploadDocument, updateDocument, deleteDocument } from "./document.service";
 import { User } from "../../types/userType";
 import { getUserDocuments, getDocumentById } from "./document.repository";
 import { extractTextFromPDF } from "../../common/utils/pdf";
@@ -100,6 +100,24 @@ export const getDocumentByIdHandler = async (req: any, res: Response, next: Next
     const content = doc.filePath ? await extractTextFromPDF(doc.filePath) : doc.content ?? "";
 
     res.json({ success: true, data: { document: doc, content } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateDocumentHandler = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const document = await updateDocument(Number(req.params.id), req.user?.id, req.body ?? {});
+    res.json({ success: true, data: { document } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteDocumentHandler = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    await deleteDocument(Number(req.params.id), req.user?.id);
+    res.json({ success: true, message: "Document deleted" });
   } catch (err) {
     next(err);
   }

@@ -43,6 +43,7 @@ model Document {
   status       String    @default("pending")
   title        String?
   documentType String?   @map("document_type")
+  isFavorite   Boolean   @default(false) @map("is_favorite")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)

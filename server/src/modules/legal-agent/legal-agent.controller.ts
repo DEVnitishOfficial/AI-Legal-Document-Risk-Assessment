@@ -18,7 +18,9 @@ import {
     getConversationWithMessages,
     appendMessage,
     setConversationTitle,
-    updateConversationLanguage,
+    getConversationOwner,
+    updateConversation,
+    deleteConversation,
     linkDocumentToConversation,
     getConversationDocumentsText,
     getMessageById,
@@ -38,6 +40,26 @@ const getOwnedConversation = async (conversationId: number, userId?: number) => 
     }
 
     return conversation;
+};
+
+const MAX_TITLE_LENGTH = 120;
+
+// Same 404/403 checks as getOwnedConversation, without loading the messages.
+const getOwnedConversationOwner = async (conversationId: number, userId?: number) => {
+    if (!Number.isInteger(conversationId)) {
+        throw new AppError("Invalid conversation id", 400);
+    }
+
+    const owner = await getConversationOwner(conversationId);
+
+    if (!owner) {
+        throw new AppError("Conversation not found", 404);
+    }
+    if (owner.userId !== userId) {
+        throw new AppError("Not authorized to access this conversation", 403);
+    }
+
+    return owner;
 };
 
 // Best-effort document context: a failed extraction (e.g. a
@@ -144,16 +166,53 @@ export const getConversationHandler = async (req: any, res: Response, next: Next
 export const updateConversationHandler = async (req: any, res: Response, next: NextFunction) => {
     try {
         const conversationId = Number(req.params.id);
-        const { language } = req.body;
+        const { language, title } = req.body ?? {};
+        const data: { title?: string; language?: string; updatedAt?: Date } = {};
 
-        if (language !== "en" && language !== "hi") {
-            throw new AppError("language must be 'en' or 'hi'", 400);
+        if (language !== undefined) {
+            if (language !== "en" && language !== "hi") {
+                throw new AppError("language must be 'en' or 'hi'", 400);
+            }
+            data.language = language;
         }
 
-        await getOwnedConversation(conversationId, req.user?.id);
-        const conversation = await updateConversationLanguage(conversationId, language);
+        if (title !== undefined) {
+            if (typeof title !== "string" || !title.trim()) {
+                throw new AppError("Title cannot be empty", 400);
+            }
+            if (title.trim().length > MAX_TITLE_LENGTH) {
+                throw new AppError(`Title must be ${MAX_TITLE_LENGTH} characters or fewer`, 400);
+            }
+            data.title = title.trim();
+        }
+
+        if (Object.keys(data).length === 0) {
+            throw new AppError("Nothing to update — send a title or language", 400);
+        }
+
+        const owner = await getOwnedConversationOwner(conversationId, req.user?.id);
+
+        // Renaming shouldn't reorder the list — keep the existing updatedAt
+        // (the @updatedAt column would otherwise bump it on any update).
+        if (data.title !== undefined && data.language === undefined) {
+            data.updatedAt = owner.updatedAt;
+        }
+
+        const conversation = await updateConversation(conversationId, data);
 
         res.json({ success: true, data: { conversation } });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const deleteConversationHandler = async (req: any, res: Response, next: NextFunction) => {
+    try {
+        const conversationId = Number(req.params.id);
+        await getOwnedConversationOwner(conversationId, req.user?.id);
+        await deleteConversation(conversationId);
+
+        res.json({ success: true, message: "Conversation deleted" });
     } catch (err) {
         next(err);
     }

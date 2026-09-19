@@ -1,54 +1,44 @@
-import { UploadCloud, ScanSearch, FolderOpen } from "lucide-react";
 import Sidebar from "../components/layout/Sidebar";
-import PageIntro from "../components/layout/PageIntro";
-import UploadPanel from "../features/document/UploadPanel";
-import DocumentList from "./DocumentList";
-import ResultPanel from "./ResultPanel";
-import { useDocumentAnalysis } from "../features/document/useDocumentAnalysis";
+import WelcomeHeader from "../features/dashboard/WelcomeHeader";
+import StatCards from "../features/dashboard/StatCards";
+import RecentDocuments from "../features/dashboard/RecentDocuments";
+import RecentChats from "../features/dashboard/RecentChats";
+import { useDashboardData } from "../features/dashboard/useDashboardData";
+import { useDocumentActions } from "../features/document/useDocumentActions";
 
+// The Dashboard is an overview only — uploading and analyzing live on the
+// Documents page, chatting on Legal Assistant.
 export default function Dashboard() {
-  const {
-    selectedId,
-    analysis,
-    analyzing,
-    refreshKey,
-    runAnalysis,
-    handleUploaded,
-  } = useDocumentAnalysis();
+  const { documents, chats, loading, failed, updateDocument, removeDocument } = useDashboardData();
+
+  const actions = useDocumentActions({ onUpdated: updateDocument, onDeleted: removeDocument });
 
   return (
     <div className="flex h-screen bg-cream-50 dark:bg-navy-950 text-navy-950 dark:text-cream-50">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <PageIntro
-          storageKey="dashboard"
-          eyebrow="Case workspace"
-          title="Analyze a legal document"
-          description="Start here. Upload a lease, notice, FIR or contract — or paste its text — and NyayMitra reads every clause, scores the risk, and explains in plain language what to watch out for."
-          points={[
-            { icon: UploadCloud, title: "1. Add a document", text: "Upload a PDF or paste text (at least 50 characters) on the left." },
-            { icon: ScanSearch, title: "2. Read the report", text: "The risk score, summary and flagged clauses appear on the right in a few seconds." },
-            { icon: FolderOpen, title: "3. Find it later", text: "Every analysis is saved — reopen it any time from Documents." },
-          ]}
-        />
+      <main className="flex-1 min-w-0 overflow-y-auto">
+        <div className="p-6 space-y-5 max-w-7xl mx-auto">
+          <WelcomeHeader />
 
-        {/* 🔹 Main Content */}
-        <div className="flex-1 min-h-0 p-6 grid grid-cols-2 gap-6">
-          <div className="min-h-0 overflow-y-auto">
-            <UploadPanel onUploaded={handleUploaded} disabled={analyzing} />
-            <DocumentList
-              refreshKey={refreshKey}
-              selectedId={selectedId}
-              onSelect={(doc: any) => runAnalysis(doc.id)}
-            />
-          </div>
+          {failed && (
+            <p role="alert" className="text-sm rounded-lg px-4 py-3 bg-risk-high-bg text-risk-high-fg dark:bg-risk-high-bg-dark dark:text-risk-high-fg-dark">
+              Couldn't load your workspace. Check your connection and refresh the page.
+            </p>
+          )}
 
-          <div className="min-h-0">
-            <ResultPanel result={analysis} analyzing={analyzing} />
+          <StatCards documents={documents} chats={chats} loading={loading} />
+
+          {/* Side by side only when the documents table (the wider content) fits
+              beside a fixed-width chat column; stacked below that. */}
+          <div className="grid min-[1400px]:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
+            <RecentDocuments documents={documents} loading={loading} actions={actions} />
+            <RecentChats chats={chats} loading={loading} />
           </div>
         </div>
-      </div>
+      </main>
+
+      {actions.dialogs}
     </div>
   );
 }

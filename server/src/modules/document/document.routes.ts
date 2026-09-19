@@ -5,6 +5,8 @@ import {
   uploadDoc,
   getDocumentByIdHandler,
   getDocumentFileHandler,
+  updateDocumentHandler,
+  deleteDocumentHandler,
 } from "./document.controller";
 import { upload } from "../../config/multer";
 import { authMiddleware } from "../../common/middleware/auth.middleware";
@@ -24,5 +26,7 @@ router.post("/text", authMiddleware, standardRateLimiter, createTextDocumentCont
 router.get("/get-documents", authMiddleware, getDocuments);
 router.get("/:id/file", authMiddleware, getDocumentFileHandler);
 router.get("/:id", authMiddleware, getDocumentByIdHandler);
+router.patch("/:id", authMiddleware, standardRateLimiter, updateDocumentHandler);
+router.delete("/:id", authMiddleware, standardRateLimiter, deleteDocumentHandler);
 
 export default router;

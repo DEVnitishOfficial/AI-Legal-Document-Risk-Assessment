@@ -9,7 +9,30 @@ export const listConversations = async (userId: number) => {
     return prisma.conversation.findMany({
         where: { userId },
         orderBy: { updatedAt: "desc" },
+        // Message count for the Dashboard's "6 messages" line.
+        include: { _count: { select: { messages: true } } },
     });
+};
+
+// Ownership check for operations that don't need the message history
+// (getConversationWithMessages loads every message).
+export const getConversationOwner = async (conversationId: number) => {
+    return prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { userId: true, updatedAt: true },
+    });
+};
+
+export const updateConversation = async (
+    conversationId: number,
+    data: { title?: string; language?: string; updatedAt?: Date }
+) => {
+    return prisma.conversation.update({ where: { id: conversationId }, data });
+};
+
+// Messages and attached-document links cascade with it.
+export const deleteConversation = async (conversationId: number) => {
+    return prisma.conversation.delete({ where: { id: conversationId } });
 };
 
 export const getConversationWithMessages = async (conversationId: number) => {

@@ -11,6 +11,10 @@ export function useLegalChat() {
     const [attachedDocuments, setAttachedDocuments] = useState<AttachedDocument[]>([]);
     const [language, setLanguageState] = useState<ChatLanguage>("en");
     const [loadingConversations, setLoadingConversations] = useState(false);
+    // True once the first list fetch has settled (success or failure) —
+    // callers that create/select conversations on mount wait for this so the
+    // list response can't overwrite what they just added.
+    const [conversationsLoaded, setConversationsLoaded] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
     // Set to the id of the assistant message currently receiving streamed
@@ -28,6 +32,7 @@ export function useLegalChat() {
             toast.error(err?.response?.data?.message || "Failed to load conversations");
         } finally {
             setLoadingConversations(false);
+            setConversationsLoaded(true);
         }
     }, []);
 
@@ -46,6 +51,9 @@ export function useLegalChat() {
             setLanguageState(conversation.language);
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to load conversation");
+            // Don't stay "in" a conversation that couldn't be opened — a later
+            // message would be sent to it and fail the same way.
+            setActiveId((current) => (current === id ? null : current));
         } finally {
             setLoadingMessages(false);
         }
@@ -190,6 +198,29 @@ export function useLegalChat() {
         [activeId]
     );
 
+    // Both throw on failure so the dialog that called them can stay open;
+    // the caller shows the error.
+    const renameConversation = useCallback(async (id: number, title: string) => {
+        const res = await API.patch(`/legal-agent/conversations/${id}`, { title });
+        const updated: Conversation = res.data.data.conversation;
+        setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c)));
+    }, []);
+
+    const deleteConversation = useCallback(
+        async (id: number) => {
+            await API.delete(`/legal-agent/conversations/${id}`);
+            setConversations((prev) => prev.filter((c) => c.id !== id));
+
+            // Deleting the open chat returns to the empty "ask a question" view.
+            if (id === activeId) {
+                setActiveId(null);
+                setMessages([]);
+                setAttachedDocuments([]);
+            }
+        },
+        [activeId]
+    );
+
     const attachDocument = useCallback(
         async (documentId: number) => {
             const conversationId = await ensureConversation();
@@ -215,6 +246,7 @@ export function useLegalChat() {
         attachedDocuments,
         language,
         loadingConversations,
+        conversationsLoaded,
         loadingMessages,
         sending,
         streamingMessageId,
@@ -222,6 +254,8 @@ export function useLegalChat() {
         startNewConversation,
         sendMessage,
         changeLanguage,
+        renameConversation,
+        deleteConversation,
         attachDocument,
     };
 }

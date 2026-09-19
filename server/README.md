@@ -1238,3 +1238,31 @@ The redesigned Documents grid (see `client/README.md` Phase 12) shows a High/Med
 * `npx tsc --noEmit` clean; verified end to end through the UI: four seeded documents returned High / Low / Medium / null and rendered as the matching chips.
 
 ---
+
+# 🗑️ Document & Chat Management Endpoints (Phase 17)
+
+---
+
+## 📌 Overview
+
+Documents and conversations could only be created. The new Dashboard/Documents/Legal Assistant UI (see `client/README.md` Phase 14) needs rename, delete, and favorite.
+
+---
+
+## 🔑 What changed
+
+* **Schema**: `Document.isFavorite Boolean @default(false)` (`is_favorite`). Migration `20260919120000_add_document_favorite` was applied by running its SQL directly against the dev DB, then `prisma migrate resolve --applied` + `prisma generate` (non-interactive `migrate dev` is blocked here, same as the phone/OTP migration).
+* **`PATCH /documents/:id`** `{ title?, isFavorite? }` — title trimmed, 1–120 chars; isFavorite must be a boolean; at least one field. **`DELETE /documents/:id`** — removes the row (Analysis and conversation links cascade) **and the uploaded file**, via new `common/utils/files.ts::removeUploadedFile`: best-effort, never throws, and only ever unlinks paths inside `uploads/`. The file goes *after* the row, so a failed DB delete can't orphan a live document. Both use the existing ownership pattern (404 → 403) plus `standardRateLimiter`, and reject non-numeric ids with 400 (the older handlers don't).
+* **`PATCH /legal-agent/conversations/:id`** now takes `title` and/or `language` (`language` used to be mandatory). A **rename keeps `updatedAt`** — the `@updatedAt` column would otherwise bump the chat to the top of the list. **`DELETE /legal-agent/conversations/:id`** cascades messages and document links. Ownership for both uses a new lightweight `getConversationOwner` (selects `userId`/`updatedAt` only; the existing `getOwnedConversation` loads every message).
+* `GET /documents/get-documents` no longer returns each document's full `content` (`omit`) — the Dashboard and Documents pages fetch it on every visit and nothing in the list displays text. `GET /legal-agent/conversations` now includes `_count.messages`.
+* `markDocumentAnalyzed` no longer overwrites an existing `title`: documents start untitled, so a title present at first analysis was set by the user (renamed before analysis).
+
+---
+
+## ✅ Result (curl against the running server with two throwaway users)
+
+* Documents: trimmed rename `200`; empty / 121-char title, non-boolean `isFavorite`, empty body, non-numeric id → `400`; other user's document `403`; unknown id `404`; delete removed the file from `uploads/` and the analysis row, and a second delete returns `404`. The list carried `isFavorite` and the analysis chip data with no `content` field.
+* Chats: rename `200` and list order unchanged; language still works; bad language / empty title / empty body `400`; other user `403`; unknown `404`; delete cascaded the messages.
+* Known gaps left alone: voice-reply audio under `uploads/audio/` isn't removed when a chat is deleted (same as before, no cleanup existed), and `attachDocumentHandler` doesn't verify the attached document belongs to the user.
+
+---

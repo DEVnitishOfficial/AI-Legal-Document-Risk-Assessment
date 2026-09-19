@@ -36,7 +36,15 @@ export function useDocumentAnalysis() {
     runAnalysis(documentId);
   };
 
+  // Used when the open document is deleted, so its report doesn't linger.
+  const clearSelection = () => {
+    setSelectedId(null);
+    setAnalysis(null);
+    setAnalyzing(false);
+  };
+
   return {
+    clearSelection,
     selectedId,
     analysis,
     analyzing,

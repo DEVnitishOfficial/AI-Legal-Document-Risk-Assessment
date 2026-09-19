@@ -7,6 +7,7 @@ import {
     listConversationsHandler,
     getConversationHandler,
     updateConversationHandler,
+    deleteConversationHandler,
     sendMessageHandler,
     sendVoiceMessageHandler,
     getMessageAudioHandler,
@@ -19,6 +20,7 @@ router.post("/conversations", authMiddleware, createConversationHandler);
 router.get("/conversations", authMiddleware, listConversationsHandler);
 router.get("/conversations/:id", authMiddleware, getConversationHandler);
 router.patch("/conversations/:id", authMiddleware, updateConversationHandler);
+router.delete("/conversations/:id", authMiddleware, standardRateLimiter, deleteConversationHandler);
 router.post("/conversations/:id/messages", authMiddleware, aiRateLimiter, sendMessageHandler);
 router.post(
     "/conversations/:id/voice-messages",

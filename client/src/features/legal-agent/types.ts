@@ -44,4 +44,6 @@ export interface Conversation {
     updatedAt: string;
     messages?: Message[];
     documents?: ConversationDocumentLink[];
+    /** Present on the list response only. */
+    _count?: { messages: number };
 }

@@ -608,3 +608,30 @@ Logging out was supposed to land on the public home page (so the visitor can see
 * Testing note: a fake `localStorage` token did **not** reproduce the bug (the user never loaded, so the timing differed) — only a real login did.
 
 ---
+
+# 🏠 Dashboard Overview + Document/Chat Management (Phase 14)
+
+---
+
+## 📌 Overview
+
+The Dashboard was the document-analysis workspace (upload panel, list, report), so it never told a user what the platform actually holds. It is now a clean **overview**; analyzing moved to the Documents tab, and both documents and chats can now be managed (rename / delete / favorite) instead of only created.
+
+---
+
+## 🔑 What was built
+
+* **Dashboard** (`pages/Dashboard.tsx`, new `features/dashboard/`): time-of-day welcome with the user's first name and Upload / New chat buttons; a stats row (Documents, Chats, High-risk documents, Favorites — all derived from the two existing list endpoints, no dashboard endpoint); a **Recent documents** table (latest 5: name, type, date, risk chip, and view / favorite / rename / delete actions); **Recent chats** (latest 5 with "N messages · 1 hour ago"). Empty accounts get onboarding cards ("Analyze your first document", "Ask your first question") in place of the old `PageIntro`. Side-by-side layout only from 1400px; stacked below, because the table clipped its Actions column at narrower widths.
+* **Shared document actions** (`features/document/useDocumentActions.tsx`, `DocumentActionButtons.tsx`, `documentApi.ts`): one hook owns rename/delete/favorite/view + their dialogs, so the Dashboard table and the Documents cards behave identically. New reusable `components/ui/ConfirmDialog.tsx` and `RenameDialog.tsx` (Esc/backdrop to cancel, Save disabled until the name actually changes, dialog stays open on a server error), and `utils/timeAgo.ts` (`Intl.RelativeTimeFormat`, no dependency).
+* **Documents tab** now carries the moved analyze feature: the upload panel sits at the top, cards gained the same actions and a favorite star, and `?doc=<id>` (from the Dashboard's file-name link) auto-opens that report and is then cleared. Cards became `div role=button` (they contain buttons now). `useDocumentAnalysis.clearSelection()` drops the report when its document is deleted.
+* **Legal Assistant chat management**: `ConversationSidebar` rows have rename and delete on hover/focus (locked for the open chat while a reply is streaming); `useLegalChat` gained `renameConversation`/`deleteConversation`, and a failed conversation load no longer leaves that id "active". The Dashboard deep-links in with `?c=<id>` (open) or `?new=1` (start), handled once and only *after* the chat list has loaded — otherwise the list response could overwrite a chat created by the link.
+
+---
+
+## ✅ Result (headless Chromium with real login, API-seeded data, light + dark)
+
+* 21 UI checks pass: greeting/stats/rows, favorite (star + stat), rename, view modal, delete (cancel keeps, confirm removes and updates the count), file name → open report with the param cleared, deleting the open card clears its report, chat click opens that exact chat, sidebar rename, deleting the open chat returns to the empty view, "New chat" from the Dashboard, and the brand-new-user empty states. Zero console errors.
+* Caught by looking at screenshots, not assertions: the documents table clipped the Actions column at 1440px and again at 1280px. Fixed and re-measured overflow at 1440 / 1280 / 1100 (light + dark).
+* Test lessons: `text=` locators are case-insensitive substring matches, so `text=Risk score` matched the intro's lowercase copy and let a test race the real report — use `h2:text-is(...)`. Stale Vite processes on 5173–5175 silently moved a fresh dev server to another port while the old one kept serving; kill them before testing.
+
+---
