@@ -635,3 +635,58 @@ The Dashboard was the document-analysis workspace (upload panel, list, report), 
 * Test lessons: `text=` locators are case-insensitive substring matches, so `text=Risk score` matched the intro's lowercase copy and let a test race the real report — use `h2:text-is(...)`. Stale Vite processes on 5173–5175 silently moved a fresh dev server to another port while the old one kept serving; kill them before testing.
 
 ---
+
+# 🧑‍⚖️ Connect Advocate — Phase 0: Admin Panel for Advocates (Phase 15)
+
+---
+
+## 📌 Overview
+
+The admin side of the "Connect Advocate" feature (see `server/README.md` Phase 18 for the model and rules): create and manage the advocates clients will later connect with — real advocates and the NyayMitra AI advocate — from one panel. The client-facing Connect Advocate tab and the live meeting come in later phases.
+
+---
+
+## 🔑 What was built
+
+* **`AdminRoute`** — guards `/admin/advocates`: no token → `/login`; profile still loading → "Checking access…"; not an admin → `/dashboard`. Client-side convenience only; the server re-checks the role in the database on every admin request. **`Sidebar`** shows an "Admin" item only when `user.role === "ADMIN"`. (Also tidied the stale, overlapping comment in `Sidebar`'s `handleLogout`.)
+* **`pages/admin/AdvocatesAdminPage.tsx`** — list of advocates (photo/initials, AI or Human tag, status, verified badge) with an editor beside it. `features/admin/`: `AdvocateProfileForm` (profile fields, photo upload/remove, and a Publishing section: status, verification, accepting consultations — the form re-syncs to what the server actually stored, e.g. disabling clears "accepting"), `CredentialsEditor` (credential types offered depend on the advocate kind, so the AI editor can only add knowledge sources/scope; a ✓ toggle marks a credential as checked), `AiConfigEditor` (model, voice, temperature, session length, retrieval settings, persona notes — with the note that the safety and citation rules are built in and can't be edited), plus a delete confirmation. Server rule messages are shown as toasts (e.g. "A human advocate must be verified before being published…").
+* Labels adapt to the kind: an AI has "Areas covered / Courts covered (judgments)" where a human has "Practice areas / Practises before", and no years-of-experience field — the AI is described by what it covers, never by credentials it doesn't have.
+
+---
+
+## ✅ Result (headless Chromium, real accounts, light + dark)
+
+* A normal user sees no Admin item and is bounced from `/admin/advocates` to the dashboard. An admin sees the panel with the default AI advocate; the AI's credential dropdown offers only Knowledge source / Scope / Last verified.
+* AI config edit saves and the version bumps. A human advocate can be created (as a Draft), is refused publishing while unverified, is refused verification until the enrolment is ticked as checked, then publishes with the verified badge; a photo uploads and displays; delete removes it. No console errors. Test accounts/advocates deleted afterwards.
+
+---
+
+# 🎙️ Connect Advocate — Phase 3: The Live Consultation Screens (Phase 16)
+
+---
+
+## 📌 Overview
+
+The client for the live voice consultation (server: Phases 18–21). A new **Connect Advocate** section lets a signed-in user pick an advocate, check in like a video-call lobby, talk to the NyayMitra AI Advocate by voice, watch the transcript and the law it relies on appear live, and keep a written summary afterwards.
+
+---
+
+## 🔑 What was built
+
+* **Choose screen** (`/connect-advocate`, `pages/ConnectAdvocatePage.tsx`): a guide, then the **AI advocate card** and a **Human advocates** section. `AdvocateCard` is one component for both kinds (photo, headline, languages, coverage, practice areas, credentials), so switching human advocates on later needs no redesign — humans are listed from the same API and rendered with a disabled "Coming soon" button (an empty state explains what will appear). The AI card carries an **AI** badge, a plain "not a human lawyer / can't appear in court" notice, and a "What it is grounded in" list built from its knowledge-source credentials, so the profile never claims an Act that isn't loaded.
+* **Check-in** (`/connect-advocate/join/:slug`, `LobbyPanel`): state (with a "not sure / central law only" option) and language, a **real microphone test** with a live level meter, the recording/AI notice with a consent checkbox (Join stays disabled without it — the server requires it too), and the remaining daily minutes. Nothing is created or billed until Join is pressed.
+* **Live room** (`/connect-advocate/session/:id`, `CallRoom` + `useConsultationCall`): a meeting-style layout — advocate tile and your tile with **speaking rings driven by real audio levels**, mute, end call, a countdown that turns red in the last minute, a permanent "you are speaking with an AI" strip, and a side panel with **Transcript** and **Sources** tabs. The transcript shows each provision the advocate mentions as a chip: green *confirmed from the official text*, amber *unverified* (with a text alternative for screen readers). Sources lists every provision looked up, expandable, with a link to the official document.
+* **How the call works in the browser** (`useConsultationCall.ts`): microphone → `RTCPeerConnection` → complete offer (waits for ICE) → `POST /consultations/:id/connect` → set the answer. The browser only carries audio; law lookups, the transcript and time limits are the server's job (the transcript is polled every 1.5 s). Everything is torn down on hang-up, connection failure, a server-side end (time limit / silence) or **leaving the page — which ends the call** so it never keeps running unseen.
+* **Summary** (`SummaryView`): situation and key facts, the law that applies (with a warning banner if any provision could not be confirmed), options with steps / where / how long / likely reaction / risks, what the advocate suggested ("the decision is yours"), next steps, deadlines, points to confirm with an advocate, and the AI disclaimer; print / save as PDF, the full transcript and sources, and delete. It handles pending / failed / skipped summaries honestly.
+* **History** (`/connect-advocate/history`): past consultations with status, duration and "Summary ready"; delete with confirmation.
+* **Sidebar**: a "Connect Advocate" item; active highlighting now covers sub-pages (`/connect-advocate/…`), and the shared page frame reserves room for the mobile menu button.
+
+---
+
+## ✅ Result (Playwright, real Chromium against the running app and API; a synthetic caller speaks through a fake microphone)
+
+35 UI checks pass, including: the AI badge and disclaimer, disabled human card, Join blocked until consent; auto-join after check-in with a live countdown and "AI" strip; the advocate's greeting, the caller's speech, the law lookup and a green **BNS s.304** chip appearing in the transcript; the Sources tab with an official-text link; ending the call → summary with the disclaimer and no unverified warning; the full transcript from the summary; history "Completed · Summary ready"; delete removing the record and its turns; **navigating away mid-call ends it (`ENDED/user_ended`)**; the microphone test meter; no console errors; no horizontal scroll at 1440 px or 390 px; light and dark screenshots reviewed.
+
+**Known limits:** an advocate who takes longer than a few seconds to answer shows "Listening" with no spinner; the speaking rings use audio loudness, not the model's own events; refreshing the page during a call drops the call (it is closed by the server within moments and the summary is still produced).
+
+---

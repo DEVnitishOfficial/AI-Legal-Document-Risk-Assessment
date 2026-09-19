@@ -1266,3 +1266,155 @@ Documents and conversations could only be created. The new Dashboard/Documents/L
 * Known gaps left alone: voice-reply audio under `uploads/audio/` isn't removed when a chat is deleted (same as before, no cleanup existed), and `attachDocumentHandler` doesn't verify the attached document belongs to the user.
 
 ---
+
+# 🧑‍⚖️ Connect Advocate — Phase 0: Roles, Admin & the Advocate Model (Phase 18)
+
+---
+
+## 📌 Overview
+
+First phase of the "Connect Advocate" feature (live consultations with the NyayMitra AI advocate now, real advocates later — see the approved plan). This phase builds the foundation only: an admin role, security hardening, and one profile structure shared by AI and human advocates, managed through an admin API. No consultations/voice yet (later phases).
+
+---
+
+## 🔑 What was built
+
+* **Roles**: `User.role` (`USER | ADMIN`, default `USER`). `requireAdmin` (`common/middleware/admin.middleware.ts`) re-reads the role **from the database on every call** — never from the 7-day JWT — so a demotion is immediate. Admins are promoted at server start from the `ADMIN_EMAILS` env var (comma-separated, additive: removing an email does not demote). `POST /rag/ingest` is now `requireAdmin` instead of the old shared `x-ingest-secret` header.
+* **Security hardening** (found while mapping the code): login/register/OTP responses **no longer contain the bcrypt password hash** (`user.mapper.ts::toSafeUser`, applied everywhere a user leaves the API); `authMiddleware` no longer logs the raw `Authorization` header and decoded token on every request; the register controller no longer logs the plaintext password; the Google strategy no longer logs the profile, the user record or the JWT.
+* **Advocate model** (`advocates`, `advocate_credentials`, `advocate_ai_configs`; migration `20260920100000_add_roles_and_advocates`, applied by SQL + `migrate resolve` like earlier ones): one profile structure for both kinds — name, slug, photo, headline, bio, languages, practice areas, courts, states covered, experience, status (`DRAFT/ACTIVE/DISABLED`), verification, accepting-consultations, order. Credentials are typed per kind: humans get `ENROLMENT/DEGREE/CERTIFICATION/BAR_MEMBERSHIP`, the AI only `KNOWLEDGE_SOURCE/SCOPE/LAST_VERIFIED` (enforced by the API — the AI can never carry an invented degree or bar number). The AI has a 1:1 `advocate_ai_configs` row: model, voice, temperature, persona notes, max session minutes, retrieval settings, and a `version` that bumps on every edit.
+* **Trust rules enforced server-side**: a new advocate is always a DRAFT and not accepting; a **human** can only be verified once an `ENROLMENT` credential has itself been marked verified (i.e. checked against the Bar Council record), can only be ACTIVE/accepting once verified, and the last verified enrolment can't be un-checked, retyped or deleted while the advocate is verified; disabling an advocate switches "accepting" off.
+* **API**: `GET /advocates`, `GET /advocates/:slug` (signed-in users, ACTIVE only, never the model/prompt/config); admin-only `/admin/advocates` (list/create/get/patch/delete), `/:id/credentials` (add/patch/delete), `PUT /:id/ai-config`, `POST|DELETE /:id/photo`. AI config is validated against an allowlist (`gpt-realtime`, `gpt-realtime-mini`; ten Realtime voices; temperature 0.6–1.2 — the Realtime API's own limit; 5–60 min sessions), so a typo can't break every consultation. The safety/citation core prompt is code-owned (later phase) — the admin-editable `personaPrompt` is only a style layer on top.
+* **Photos**: `uploads/advocates/` is the only directory served statically (the rest of `uploads/` — client documents, voice recordings — never is). Upload accepts JPEG/PNG/WebP ≤ 2 MB with a random server-chosen filename, **verifies the file's magic bytes** (multer only trusts the client's declared type), removes rejected files, and replaces/deletes the old photo file.
+* **Startup seeding**: `ensureDefaultAiAdvocate()` creates "NyayMitra AI Advocate" once (idempotent), described honestly ("an AI advocate, not a human lawyer… cannot appear in court") with no credentials until knowledge sources are actually ingested.
+
+---
+
+## ✅ Result (curl-style API suite, 45 checks, against the running server with throwaway users)
+
+* Hardening: no `password` in login/register/`/me` responses. Permissions: 401 unauthenticated, 403 for a normal user on every admin route and on RAG ingest.
+* Public list shows the AI advocate with **no** model/config/prompt; AI credential types rejected on humans and vice-versa; `ai-config` rejected on a human; bad model/voice/temperature/minutes → 400; a valid edit bumps `version`.
+* Trust rules: unpublished/unverified human blocked, verifying blocked until the enrolment is checked, un-check/delete of the only verified enrolment blocked, disable hides the advocate and clears accepting.
+* Photos: real PNG accepted and served with an image content-type; a text file renamed `.png`, a PDF, and a >2 MB image are all rejected with no stray files left; other `uploads/` files are not served; deleting an advocate removes its photo.
+
+**Setup needed:** set `ADMIN_EMAILS=<your account email>` in `server/.env` and restart the API — otherwise nobody is an admin.
+
+---
+
+# ⚖️ Connect Advocate — Phase 1: Grounded Legal Knowledge (Phase 19)
+
+---
+
+## 📌 Overview
+
+The accuracy core of the AI advocate. Until now the knowledge base was a private aggregator (Indian Kanoon) with no section labels, no filters and no cut-off — the model chose its own citations and nothing checked them. This phase loads the **official statute text from a government site**, section by section, and adds retrieval that the server controls plus a check on every provision the advocate later quotes. No voice/consultation yet (next phase).
+
+---
+
+## 🔑 What was built
+
+* **Official sources, downloaded directly** — the Home Ministry's gazette PDFs for the **BNS (358 sections), BNSS (531) and BSA (170)** (`rag.sources.ts`). No Firecrawl credits are used; text is extracted with `pdf-parse`. Adding an Act is one registry entry (URL + expected section count).
+* **Section parser** (`rag.statute-parser.ts`): strips the gazette header / rule / page-number furniture on every page and accepts a section start only when its number is the **next one in sequence**, which keeps numbered lists and illustrations inside a section from being mistaken for new sections (it also handles the BNS PDF's bare `111.` lines with the text on the next line). Long sections are split at their `(1) (2)…` sub-sections. Marginal headings aren't reliably extractable from these PDFs, so `section_heading` stays empty rather than being guessed.
+* **Ingest refuses a partial Act** (`rag.statute-ingest.ts`): if the parsed count differs from the expected count nothing is written or deleted. Each chunk is prefixed `"<Act> — Section N"` and embedded in batches of 64; the previous version of that Act is replaced only after everything succeeded. Real run: 1,241 chunks in ~106 s (~$0.02 of embeddings).
+* **Migration `20260920110000_add_knowledge_grounding_metadata`** (applied by SQL + `migrate resolve`): `source_type` (`GOV_STATUTE / GOV_JUDGMENT / GOV_GAZETTE / AGGREGATOR`), `source_domain`, `jurisdiction` (default `IN`, room for state codes), `act_short`, `section_heading`, `language`, `effective_from/to`, plus indexes. The 259 existing Indian Kanoon rows are tagged `AGGREGATOR` and are **never** used by the advocate.
+* **`retrieveGrounded`** (`rag.grounded.ts`): filters by jurisdiction (`IN` + the client's state, injected by the server — never chosen by the model) and government source types; **nothing below the similarity threshold is returned**, so "no answer" is a real outcome; a query that names a provision ("Section 482 BNSS") is looked up **exactly** and put first.
+* **`search_law` tool** for the live advocate: describes itself as mandatory before stating any section, and on an empty result tells the model to say it cannot confirm the provision and refer the client to an enrolled advocate.
+* **Citation verifier** (`verifyCitations`): finds "Section N of <Act>", "BNSS s.482", "Sections 316 and 318 of BNS", … in what the advocate said and marks each `verified` (it was retrieved), `unverified_not_retrieved`, or `unverified_act_not_loaded` (e.g. IPC/CrPC — legitimate for pre-1 July 2024 offences, but no text is loaded so they can never be shown as verified).
+* **Admin API**: `POST /rag/ingest-statutes {acts?: ["BSA"]}` and `GET /rag/statutes` (both `requireAdmin`). A successful ingest re-syncs the AI advocate's `KNOWLEDGE_SOURCE`/`LAST_VERIFIED` credentials to exactly what is loaded — only system-written (`auto:`) credentials are replaced; anything an admin typed is left alone.
+* **Golden eval**: `npm run rag:eval` (`rag.golden.ts`, `rag.eval.ts`) — exits non-zero on failure.
+
+---
+
+## ✅ Result
+
+* **Parser**: 358/358, 531/531, 170/170 sections with no gaps; spot checks BNS 103 (murder), 318 (cheating), 64 (rape), BNSS 35 / 482, BSA 63 matched the official text.
+* **Retrieval** (22 plain-language questions, e.g. "anticipatory bail", "someone snatched my chain"): the right provision is in the top 8 for **22/22** and ranked first for **14/22** (e.g. plain "punishment for murder" ranks BNS 103 fourth, behind the attempt/abetment sections — the live advocate writes its own legal-vocabulary queries and sees several passages).
+* **Threshold**: weakest correct hit 0.336, clearly unrelated questions ≤ 0.2, so the default is **0.30**. A cut-off cannot separate *adjacent* topics from answerable ones (GST filing dates 0.328, tenant eviction 0.353 still reach the model), so those are reported, not failed — the prompt and the citation verifier are the guard there.
+* **Citation parsing**: 10/10 cases including lists, sub-sections, long Act names, IPC/CrPC (unloaded) and false-positive phrases; verifier statuses correct.
+* **API** (13 checks): 401/403 for anonymous and normal users; unknown Act reported without writing; a real BSA re-ingest replaced its 184 chunks (no duplicates), left BNS and the 259 aggregator rows untouched, and the AI profile lists exactly the three loaded Acts.
+
+**Not done yet (by design):** IPC/CrPC/Evidence Act (legacy), the Constitution, IT Act, Consumer Protection Act etc. — each needs its URL and section count verified before it is registered — and state law (phase 2 of the roadmap).
+
+---
+
+# ⚖️ Connect Advocate — Phase 1b: More Acts, and the Era Filter (Phase 20)
+
+---
+
+## 📌 Overview
+
+Seven more central Acts were added to the grounded knowledge base (now **10 Acts, 2,492 statute chunks**), and finding a source for each turned up several ways a "successful" ingest could have silently put wrong law in front of the advocate. Those checks are now part of the parser and the ingest.
+
+---
+
+## 🔑 What was added
+
+* **New Acts** (each with a verified official URL and section count): **CrPC 1973** (484), **Indian Evidence Act 1872** (167), **DV Act 2005** (37), **Consumer Protection Act 2019** (107, NCDRC), **Transfer of Property Act 1882** (137), **RTI Act 2005** (31, CIC), **POCSO 2012** (46). Source hosts: India Code (`/indiacode/bitstream/…` — the un-prefixed `/bitstream/…` links in search results mostly 404), NCDRC, CIC. The Legislative Department dashboard times out from here and `wcd.nic.in` doesn't resolve, so those weren't usable.
+* **Era filter** (`LawEra`, `actsExcludedForEra`): criminal law depends on *when the offence happened* — on/after 1 July 2024 the BNS/BNSS/BSA apply, earlier offences stay under the IPC/CrPC/Evidence Act. With both sets loaded, "can police arrest me without a warrant?" returned CrPC §41 ahead of BNSS §35 — a repealed provision quoted as current law. `retrieveGrounded` now defaults to `current` (excludes IPC/CrPC/IEA) and takes `before_2024_07_01` (excludes BNS/BNSS/BSA); civil and special laws appear in both. The `search_law` tool has an `era` argument and its description tells the model to ask the client when the offence happened. Exact lookups ("Section 438 CrPC") ignore the era because the user named the provision.
+* **Parser hardening** (all found on real files): a **contents list** looks exactly like sections, so the parser now tries a pass from every "1." line and keeps the one with the most *substantive* sections (not the longest text — the contents pass runs into the body and wins on length); **amendment footnotes** ("3. Cf. definition of…", "1. Subs. by Act…") are never taken for section starts and are dropped from bodies; substituted sections wrapped in a footnote marker (`[61.`, `50[52.`) are recognised.
+* **Quality gate in the ingest**: an Act is refused if more than 25% of its sections have almost no text — the right count with only headings under it means a contents list was captured.
+* **`syncAiKnowledgeCredentials`** now lists the 10 loaded Acts on the AI advocate's profile.
+
+---
+
+## ⚠️ Deliberately NOT ingested (and why)
+
+* **IPC 1860** — the only reachable PDF is an *extract* (58 pages: Chapters I–V-A and XXIII); ingesting it would tell the advocate that §121–510 don't exist. IPC citations stay "unverified — act not loaded".
+* **IT Act 2000** — the reachable MeitY file is the *original* 2000 text (§66 "Hacking", no §66A/66C/66D). The 2008 amendments replaced most of the offences, so it would state outdated law.
+* **Motor Vehicles Act 1988** — the reachable copy is an annotated commentary edition ("Corresponding Law…" notes and `*98.` markers mixed into the text); the advocate could quote commentary as law.
+* **Constitution of India** — the file the search listed as English is the Maithili edition; the English edition is a bilingual "diglot" whose columns interleave, so Article 21 doesn't come out as continuous text.
+* **NI Act, Contract Act, Limitation Act** — no reachable official PDF found. These (and IPC, IT, MV) are registered as `LEGACY_ACT_ALIASES`, so citing them is flagged unverified instead of being mistaken for a loaded Act.
+
+Each needs a clean official PDF (or a manual download into the registry) before it can be added.
+
+---
+
+## ✅ Result
+
+* Parser on real files: BNS 358, BNSS 531, BSA 170, CrPC 484, IEA 167, DV 37, CPA 107, TPA 137, RTI 31, POCSO 46 — every count exact, no gaps, near-empty sections 0–1 per Act (TPA §88 and IEA one are genuinely repealed).
+* `npm run rag:eval`: **33/33** golden questions have the right provision in the top 8 (**23/33** ranked first); era isolation shows **0** repealed-code hits in current answers and **0** new-code hits in legacy answers (5 queries × top 20); unrelated questions stay below the 0.30 threshold; citation parser 10/10.
+* Two golden expectations were adjusted after seeing results, and this should be known: "maintenance for wife" expects BNSS §144 / DV Act §20 (the current-era answer) and the consumer-complaint case accepts CPA §35/39/83/84 (all genuinely relevant).
+* **Known limitation:** wrapped continuation lines of amendment footnotes can remain inside older Acts' section text (the footnote's first line is dropped, the rest can stay). It does not change which section a passage belongs to.
+* Ingesting the seven new Acts in one run took ~9½ minutes (~1,250 chunks, written one at a time). Call `POST /rag/ingest-statutes` with one Act at a time (`{"acts":["CrPC"]}`) — a single HTTP request that runs this long may be cut off by a proxy or client timeout, though the ingest itself keeps going.
+
+---
+
+# 🎙️ Connect Advocate — Phase 2: Live Consultations (Phase 21)
+
+---
+
+## 📌 Overview
+
+The server side of the live voice call with the NyayMitra AI Advocate. The browser sends audio straight to OpenAI over WebRTC, but the **server brokers the call**, so the API key and the advocate's instructions never reach the browser, and everything that has to be trusted (law lookups, transcript, citation checks, time limits) runs on a server-owned channel. No client UI yet (next phase).
+
+---
+
+## 🔑 What was built
+
+* **Tables** (`consultations`, `consultation_turns`; migration `20260920120000_add_consultations`): a consultation stores the user, the advocate (name snapshotted, `ON DELETE SET NULL` so a saved consultation survives an advocate being deleted), state, language, consent time, model and AI-config version used, OpenAI call id, timings, duration, end reason, token usage and the summary. Turns are `SPEECH` (transcribed talk), `SEARCH` (a law lookup, with the passages retrieved — citation, source URL, similarity, excerpt) or `NOTICE`; advocate speech carries each provision mentioned with its verification status.
+* **Connect flow** (`POST /consultations` → `POST /consultations/:id/connect`): the client accepts the recording/AI notice (`consent: true` is required), picks state and language (English/Hindi), and creates a LOBBY record. `connect` takes the browser's SDP offer, atomically claims the lobby (two simultaneous connects can't both start a call), and forwards the offer to OpenAI's `/v1/realtime/calls` together with a **server-built session** — model, voice and persona from the AI advocate's config, the code-owned prompt, the `search_law` tool, server VAD and transcription. The SDP answer goes back to the browser.
+* **Sideband** (`consultation.realtime.ts`, uses `ws`): a second WebSocket attached to the same call. It runs `search_law` when the advocate asks (the client's **state is injected by the server**; the model can only choose the criminal-law era), saves every transcribed turn, and counts tokens. If a spoken "Section N of <Act>" was **not** among the retrieved passages, the server tells the advocate to look it up and correct itself (up to 3 times per call). A dropped socket reconnects twice; if the call is gone the session is closed.
+* **Code-owned prompt** (`consultation.prompt.ts`): discloses that it is an AI, asks one question at a time before advising, may state only law returned by `search_law`, never names a judgment (case law isn't in the knowledge base yet — it may describe how courts *generally* approach a point, marked as general understanding), separates pre/post 1 July 2024 criminal law, gives emergency numbers (112, 181/1091, 1098, 15100, 14416, 1930) first, refuses to help commit or hide offences, and says human advocates aren't available yet. The admin's persona text is appended as a tone layer that is stated to be unable to override the rules.
+* **Limits**: one live call per user; a daily allowance (`DAILY_CONSULT_MINUTES`, default 30, rolling 24 h); the per-advocate `maxSessionMinutes` capped by what is left of the allowance; a wrap-up prompt 60 s before the limit and a **server-side hang-up** at the limit; a 4-minute idle timeout (no client speech); `connect` is rate limited; an unused lobby is superseded by the next create.
+* **Never leave a call running**: ending (user, limit, idle, error) always hangs the call up at OpenAI, closes the socket, stores duration/usage and starts the summary. On startup, and before any new consultation, calls left `LIVE` by a restart are hung up and closed — with duration **capped at the session's own limit** so downtime is never charged to a user's allowance. `SIGINT/SIGTERM` end live calls cleanly.
+* **Summary** (`consultation.summary.ts`, `gpt-4.1-mini`, JSON): situation, key facts, questions asked, provisions, options (steps, forum, timeline, likely reaction, risks), recommendation, next steps, deadlines, open questions — built only from the transcript and the retrieved passages, then re-checked with the same citation verifier (`unverifiedMentions`), with the AI disclaimer added by the server.
+* **API** (all signed-in, ownership checked): `GET /consultations/options`, `GET/POST /consultations`, `GET /consultations/:id`, `GET /:id/turns?after=` (polled by the client during a call), `POST /:id/connect`, `POST /:id/end`, `DELETE /:id` (not while live).
+
+---
+
+## ✅ Result (37 API checks + a real spoken call, run with a headless Chromium and a synthetic caller)
+
+* **Guards**: 401 anonymous; consent required; bad state/language/advocate rejected; another user gets 403 on read and connect; bad or missing SDP 400; a second connect, a second consultation, or a delete while live all 409.
+* **Live call**: the advocate spoke first — *"I'm NyayMitra's AI Advocate — an AI, not a human lawyer — and this call is being transcribed"* — and the caller's speech (TTS: a gold-chain snatching in Mumbai) was transcribed. The advocate worked out from "yesterday" that current law applies, called `search_law` (6 passages, all current-era codes), and cited **Section 304 of the BNS**, which the verifier confirmed against the retrieved text. Ending the call stored duration and token usage; the summary came back `READY` with only verified provisions and the AI disclaimer.
+* **Limits**: with the session limit set to 1 minute the server ended the call itself after 61 s (`time_limit`); a fake `LIVE` record 3 hours old was closed as `server_restart` with duration 600 s (its limit), not 3 hours; with 30 minutes already used a new consultation is refused with 429 while another user is unaffected.
+
+**Things to know**
+* **Temperature has no effect on live calls.** The GA Realtime session no longer accepts a `temperature` field, so the value in the admin panel is stored but not sent.
+* **Case law is not available.** No judgments are ingested, so the advocate explains statutory text and cannot cite how a particular court ruled. This is a later phase.
+* **Only central law**: state acts (rent control, stamp duty…) are not loaded; the advocate says state rules may differ. `IPC`, `IT Act`, `MV Act`, the Constitution, NI/Contract/Limitation Acts are also not loaded (see Phase 20).
+* **Cost**: a ~90 s test call used ~7 k input / ~1.3 k output tokens; audio minutes are billed by OpenAI, hence the daily allowance.
+* **Fact-finding vs. answering varies between calls.** With the same opening speech, one run began with a fact-finding question ("have you already reported it to the police?") and the next went straight to `search_law` and an answer. The prompt asks for understanding before advice, but a live model does not follow that identically every time — worth reviewing real transcripts before launch, and tightening the prompt if it answers too early.
+* `/turns` is polled every couple of seconds by the client; it is ownership-checked but deliberately not on the strict rate limiter.
+
+---
+
+**Follow-up (Phase 21b):** the advocate repeated its "I'm an AI and this is transcribed" introduction whenever the caller said "hello" again. A line in the prompt was not enough, so after its first spoken turn the server adds a short system note to the conversation ("you have already introduced yourself…", no response triggered). Re-run: the introduction is now given once.
