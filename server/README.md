@@ -1155,3 +1155,86 @@ Two changes: (1) a standalone transcription endpoint to support a redesigned mic
 * `/speech/transcribe` verified as part of the client-side fallback flow (see client README) — correctly returns transcript text without creating any conversation activity.
 
 ---
+
+# ⚖️ Rebrand: ALDRA AI → NyayMitra AI (Phase 14)
+
+---
+
+## 📌 Overview
+
+Same-day follow-up: the user decided on a single app-wide brand name, **NyayMitra AI**, superseding the "ALDRA AI" identity set in Phase 13 (which itself only lived for one turn). Full rationale and the matching frontend rebrand + login/register redesign are in `client/README.md` Phase 8.
+
+---
+
+## 🔑 What was built
+
+* **`legal-agent.prompt.ts::PERSONA_AND_KNOWLEDGE`** — the "You are ALDRA AI..." identity line updated to "You are NyayMitra AI...", same instruction to self-identify by name when asked, same shared block feeding all three prompt variants (voice, streaming-answer, clarify-routing).
+
+---
+
+## ✅ Result
+
+Verified directly via a real streamed `curl` request (fresh test user, real conversation, real OpenAI call) — "Who are you?" now answers "I am NyayMitra AI, an AI legal information assistant specialized in Indian law..." with the capability description unchanged.
+
+---
+
+# 📱 Mobile OTP Login + Google OAuth Hardening (Phase 15)
+
+---
+
+## 📌 Overview
+
+Two things: (1) the Login page's "Mobile OTP" tab was a pure UI stub (see `client/README.md` Phase 8) — this phase makes it real, with send/verify OTP endpoints backed by MSG91. (2) Google OAuth already worked end-to-end and already supports any number of distinct Google accounts (find-or-create by email), but had two hardcoded `localhost` URLs that would break outside local dev — fixed via new env vars.
+
+---
+
+## 🔑 Mobile OTP
+
+* **Schema** (`prisma/schema.prisma`): `User.email` made nullable (a phone-only signup has no email), `User.phone` added as nullable + unique. New `OtpVerification` model (`phone, codeHash, expiresAt, attempts, consumed, lastSentAt`) — no FK to `User`, since a phone may not have an account yet at send-time. Applied via `prisma db push` (dev DB).
+* **New `modules/otp/`** (repository/service/controller/routes, same layering as `modules/user/`):
+  * `sendOtp(phone)` — enforces a 30s resend cooldown, generates a 6-digit code (`crypto.randomInt`), `bcrypt`-hashes it before storing (same pattern as password hashing — the plaintext code is never persisted), 5-minute expiry, then calls `sendOtpSms`.
+  * `verifyOtp(phone, code)` — rejects expired/missing/already-consumed OTPs and caps at 5 wrong attempts (`429` after that); on match, finds-or-creates the user by phone (same pattern as the Google flow's find-or-create-by-email, placeholder password `"OTP_AUTH_USER"`) and issues a JWT via the existing `generateToken` — identical shape to email/Google tokens, so `auth.middleware.ts` needed zero changes.
+  * `otp.sms.ts` — isolated `sendOtpSms(phone, code)` calling MSG91's Flow API via native `fetch`. Falls back to `console.log("[DEV OTP] ...")` when `MSG91_AUTH_KEY`/`MSG91_TEMPLATE_ID` aren't set, so the flow is testable before an MSG91 account/DLT-approved template exists.
+  * Routes: `POST /api/v1/auth/otp/send`, `POST /api/v1/auth/otp/verify`.
+* **Register phone fix**: `user.repository.ts::createUser` changed from positional args to an object (`{name, email?, phone?, password}`) — needed for phone-only OTP signups and now also actually persists the phone field the Register form already collected but silently dropped.
+* **New env vars**: `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID` (not yet set — dev console-log fallback active until the user has an MSG91 account + DLT-approved SMS template).
+* **Real pre-existing bug fixed while wiring the new phone-duplicate check**: `user.controller.ts::register` caught every error and always returned a generic `500 "Error registering user"`, discarding the real `AppError` status/message — the same bug class Phase 6 fixed for the document/analysis controllers, just missed here. Duplicate-email registration was already silently affected; the new duplicate-phone check would have been invisible too. Fixed by delegating to `next(err)` like `login` already does, so `error.middleware.ts` returns the real message/status.
+
+## 🔑 Google OAuth hardening
+
+* New env vars `CLIENT_URL` (default `http://localhost:5173`) and `SERVER_URL` (default `http://localhost:3000`).
+* `auth.google.ts`'s `callbackURL` and `auth.routes.ts`'s post-login redirect now build from `env.SERVER_URL`/`env.CLIENT_URL` instead of hardcoded strings; `app.ts`'s CORS `origin` list now uses the same two vars.
+* No change to the find-or-create-by-email logic itself — it already correctly handles any number of distinct Google accounts. **Not verified live** (would need a real Google consent screen); only confirmed the passport strategy still loads correctly at server boot with the env-based `callbackURL`.
+
+---
+
+## ✅ Result (verified via `curl` + direct `psql` inspection against the real dev DB, all test rows cleaned up after)
+
+* `POST /auth/otp/send` → `POST /auth/otp/verify` round-tripped correctly: new `users` row created with the phone and `OTP_AUTH_USER` placeholder password, returned JWT accepted by `GET /users/me` (confirms parity with email/Google tokens).
+* Re-using an already-consumed/superseded code → `401 "Invalid OTP"`; requesting a second OTP inside the cooldown window → `429 "Please wait before requesting another OTP"`; 5 wrong verify attempts then a 6th → `429 "Too many attempts, please request a new OTP"` on the 6th, confirming the attempt cap holds at exactly 5 tries.
+* `POST /users/register` with a phone persists it (confirmed via `psql`); registering a second account with the same phone or same email now correctly returns `400` with the real message (`"Phone number already registered"` / `"User already exists"`) after the controller fix above — before the fix both cases returned an opaque `500`.
+* `npx tsc --noEmit` passes clean on the server after all changes.
+
+---
+
+# 🗂️ Risk Verdict on the Documents List (Phase 16)
+
+---
+
+## 📌 Overview
+
+The redesigned Documents grid (see `client/README.md` Phase 12) shows a High/Medium/Low chip on every card, but `GET /documents/get-documents` returned only the `documents` rows, so the client had no risk level to show without one analysis request per card.
+
+---
+
+## 🔑 What changed
+
+* `document.repository.ts::getUserDocuments` now `include`s the related `analysis`, selecting **only** `riskLevel` and `riskScore` — not the full summary/clauses/risk items — so the list payload stays small. Documents without an analysis return `analysis: null`, which the client renders as "Not analyzed yet".
+
+---
+
+## ✅ Result
+
+* `npx tsc --noEmit` clean; verified end to end through the UI: four seeded documents returned High / Low / Medium / null and rendered as the matching chips.
+
+---

@@ -11,10 +11,22 @@ export const registerUser = async (data: any) => {
     throw new AppError("User already exists", 400);
   }
 
+  if (data.phone) {
+    const existingPhone = await userRepo.findUserByPhone(data.phone);
+    if (existingPhone) {
+      throw new AppError("Phone number already registered", 400);
+    }
+  }
+
   // Hash the password before saving
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  return userRepo.createUser(data.name, data.email, hashedPassword);
+  return userRepo.createUser({
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    password: hashedPassword,
+  });
 };
 
 

@@ -9,9 +9,9 @@ interface DocumentListProps {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  pending: "bg-gray-500",
-  completed: "bg-green-500",
-  failed: "bg-red-500",
+  pending: "bg-gold-500",
+  completed: "bg-risk-low-fg dark:bg-risk-low-fg-dark",
+  failed: "bg-risk-high-fg dark:bg-risk-high-fg-dark",
 };
 
 export default function DocumentList({ onSelect, refreshKey, selectedId }: DocumentListProps) {
@@ -33,25 +33,25 @@ export default function DocumentList({ onSelect, refreshKey, selectedId }: Docum
   };
 
   return (
-    <div className="bg-gray-50 p-5 rounded-2xl mt-4 border border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-800 dark:text-white">
+    <div className="bg-white p-4 rounded-xl border border-cream-200 text-navy-950 dark:bg-navy-900 dark:border-white/10 dark:text-cream-50">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-lg">Your Documents</h2>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+      <div className="flex items-center justify-between mb-3 px-1">
+        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-cream-100/40">Your Documents</h2>
+        <span className="text-xs text-gray-400 dark:text-cream-100/40">
           {docs.length} items
         </span>
       </div>
 
       {/* Empty State */}
       {!loading && docs.length === 0 && (
-        <div className="text-center text-gray-500 dark:text-gray-400 py-10">
-          <p>No documents yet</p>
-          <p className="text-sm">Upload or paste text to get started</p>
+        <div className="text-center text-gray-400 dark:text-cream-100/40 py-10">
+          <p className="text-sm font-medium">No documents yet</p>
+          <p className="text-xs mt-1">Upload or paste text to get started</p>
         </div>
       )}
 
       {/* List */}
-      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+      <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
         {docs.map((doc: any) => {
           const label = doc.title || getFileName(doc.filePath);
           const subLabel = doc.documentType || (doc.filePath ? "Uploaded file" : "Pasted text");
@@ -62,41 +62,38 @@ export default function DocumentList({ onSelect, refreshKey, selectedId }: Docum
               key={doc.id}
               onClick={() => onSelect(doc)}
               className={`
-                flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all
-                border
+                flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all
+                border-l-2
                 ${
                   isSelected
-                    ? "bg-purple-600/10 border-purple-500 dark:bg-purple-600/20"
-                    : "bg-white border-transparent hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
+                    ? "bg-cream-100 border-gold-500 dark:bg-navy-800"
+                    : "border-transparent hover:bg-cream-50 dark:hover:bg-navy-800/60"
                 }
               `}
             >
               {/* Icon */}
-              <div className="p-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
+              <div className="p-2 bg-cream-100 dark:bg-navy-800 rounded-lg text-gray-500 dark:text-cream-100/50">
                 {doc.filePath ? (
-                  <File size={18} />
+                  <File size={16} />
                 ) : (
-                  <FileText size={18} />
+                  <FileText size={16} />
                 )}
               </div>
 
               {/* File Info */}
               <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium truncate">
+                <p className="text-[13px] font-semibold truncate">
                   {label}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {subLabel}
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {new Date(doc.createdAt).toLocaleDateString()}
+                <p className="text-[11.5px] text-gray-400 dark:text-cream-100/40 truncate font-mono">
+                  {subLabel} · {new Date(doc.createdAt).toLocaleDateString()}
                 </p>
               </div>
 
               {/* Status dot: pending/completed/failed */}
               <div
                 title={doc.status}
-                className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[doc.status] || "bg-gray-500"}`}
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[doc.status] || "bg-gray-400"}`}
               />
             </div>
           );

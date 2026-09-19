@@ -7,6 +7,7 @@ import ragRoutes from "../modules/rag/rag.routes";
 import speechRoutes from "../modules/speech/speech.routes";
 import "../common/middleware/auth.google";
 import authRoutes from "../modules/auth/auth.routes";
+import otpRoutes from "../modules/otp/otp.routes";
 
 
 const router = Router();
@@ -24,5 +25,6 @@ router.use("/legal-agent", legalAgentRoutes);
 router.use("/rag", ragRoutes);
 router.use("/speech", speechRoutes);
 router.use("/auth", authRoutes)
+router.use("/auth/otp", otpRoutes)
 
 export default router;

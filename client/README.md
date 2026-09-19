@@ -438,3 +438,173 @@ The mic button previously recorded then instantly sent a "voice message" the mom
 * **Identity check**: "Who are you and how can you help me?" now answers "I am ALDRA AI, an AI legal information assistant specializing in Indian law..." — verified end-to-end through a full streamed response.
 
 ---
+
+# ⚖️ Rebrand to NyayMitra AI + Editorial Login/Register Redesign (Phase 8)
+
+---
+
+## 📌 Overview
+
+Two things: (1) app-wide rename from the placeholder "LegalAI" (and the chat agent's just-set "ALDRA AI") to a single consistent brand, **NyayMitra AI**, across the sidebar, home page, browser tab title, and the agent's own self-identification; (2) a full visual redesign of the Login and Register pages from the original plain purple/gray cards to a premium "legal case file" editorial look — navy + gold + cream, serif display type, split-screen layout — built from two reference mockups the user provided, with added motion so it doesn't feel static, and full light/dark mode support. UI-only for now: a "Mobile OTP" tab is visually present (per the reference) but not wired to a real backend yet — phone-based auth is explicitly deferred to a follow-up.
+
+---
+
+## 🔑 What was built
+
+* **Rename**: `Sidebar.tsx`, `Home.tsx` ("LegalAI" → "NyayMitra AI"), `index.html`'s `<title>` (was literally "client", now "NyayMitra AI"), and `server/src/modules/legal-agent/legal-agent.prompt.ts`'s shared persona block (ALDRA AI → NyayMitra AI, see server README Phase 14).
+* **New design tokens** (`App.css`, Tailwind v4 `@theme` block): a small custom palette — `navy-*`, `gold-*`, `cream-*`, `maroon-*` — plus `font-display` (Fraunces, an editorial serif loaded via Google Fonts in `index.html`) and `font-body` (Inter). Scoped as reusable theme tokens rather than one-off hex values so the look can extend to other pages later without redefining colors.
+* **New `features/auth/` component set**, shared by both pages:
+  - `AuthShell.tsx` — the split-screen shell: a navy left branding panel (hidden below `lg:`, form stays centered on mobile) with a slowly-rotating dashed ring around a `Landmark` icon, a staggered-entrance headline/subtitle/feature list, ambient drifting gradient blobs for background motion, and a small rotating "People are asking about: {use case}" ticker (cycles through real product use-cases like "rental agreements" / "FIR copies" — a dynamism/curiosity touch that doesn't fabricate fake stats) — plus the right-side form slot.
+  - `FeatureList.tsx` — the numbered (01–04) capability list with a framer-motion stagger-in.
+  - `CaseFileCard.tsx` — the form card itself: a small maroon "ribbon" tab in the corner, a monospace file-number tag (e.g. "FILE NO. 2026/NM-0472" on Login, "NEW FILE — AWAITING DETAILS" on Register), scale/fade entrance.
+  - `AuthTabs.tsx` — Email / Mobile OTP switcher with a `layoutId`-based sliding pill background.
+  - `AuthField.tsx` — shared labeled input, with a "Show/Hide" toggle for password fields instead of a plain type-toggle icon, matching the reference's editorial label style.
+* **`Login.tsx` rewritten** on top of these: email/password sign-in (existing `loginUser` thunk, unchanged logic — just restyled), a Mobile OTP tab that collects a phone number but submits to a toast ("coming soon") rather than a real endpoint, "Keep me signed in" checkbox and "Forgot password?" link (both UI-only for now, same honest "coming soon" toast pattern rather than a silently dead control), Google OAuth button (unchanged, still real).
+* **`Register.tsx` rewritten**, and in the process a **real pre-existing bug was fixed**: the original page dispatched `registerUser` without `await`/`.unwrap()` and without any error handling — it always showed a success toast and navigated to `/login` regardless of whether registration actually succeeded (e.g. a duplicate email would silently fail while still telling the user it worked). Now properly awaits the thunk, validates client-side first (required fields, password match, 8-char minimum, terms-checkbox agreement), and surfaces real backend errors (`err?.response?.data?.message`, e.g. "User already exists") in the same animated error box as Login. Added a mobile-number field (UI-only, not yet sent anywhere) and a Terms/Privacy-Policy agreement checkbox (links show a "coming soon" toast — no such pages exist yet).
+
+---
+
+## ✅ Result (verified with Playwright — visual pass across light/dark/mobile, plus a full functional pass exercising real validation and the actual register → login → dashboard flow)
+
+* Visual: both pages screenshotted in light mode, dark mode, the Mobile OTP tab state, and a 390px-wide mobile viewport — matches the reference's structure closely, dark mode reflows correctly (gold accents keep working on the darker card), mobile correctly collapses the branding panel and stacks the form full-width. Zero console errors across every state.
+* Functional: submitting mismatched passwords shows "Passwords don't match." inline (form data preserved, not cleared); submitting without checking the terms box shows the agreement-required error; fixing both and submitting for real creates the account, redirects to `/login`, and logging in with the new credentials correctly reaches `/dashboard` — confirming the rewritten Register flow (and its bug fix) works end-to-end, not just visually.
+
+---
+
+# 📱 Mobile OTP Login Wired Up + Google Button Hardcoded-URL Fix (Phase 9)
+
+---
+
+## 📌 Overview
+
+The Mobile OTP tab left in Phase 8 as a "coming soon" stub is now wired to the real backend endpoints added in `server/README.md` Phase 15. Also fixed both pages' "Continue with Google" button and the shared axios client, which pointed at a hardcoded `http://localhost:3000` — now derived from a configurable base URL so it works outside local dev.
+
+---
+
+## 🔑 What was built
+
+* **`authSlice.ts`**: new `sendOtp`/`verifyOtp` thunks, following the exact `loginUser` pattern (`POST /auth/otp/send`, `POST /auth/otp/verify`); `verifyOtp.fulfilled` sets `user`/`token` and persists to `localStorage` the same way `loginUser.fulfilled` does.
+* **`Login.tsx`**: the Mobile OTP tab is now a real two-step flow — enter phone → `Send OTP` (dispatches `sendOtp`) → a second step with a 6-digit code field, `Verify & sign in` (dispatches `verifyOtp`, then navigates to `/dashboard`) and a `Change number` link to go back. Reuses the existing `AuthField`/`AuthTabs` components as-is, no new UI primitives needed.
+* **`Register.tsx`**: the phone field collected since Phase 8 is now actually sent in the `registerUser` dispatch payload (previously silently dropped).
+* **`services/api.ts`**: `API_BASE_URL` changed from a hardcoded string to `import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1"`. `Login.tsx`/`Register.tsx`'s "Continue with Google" buttons now build their redirect from this same constant instead of duplicating the hardcoded URL.
+
+---
+
+## ✅ Result (verified end-to-end with a real headless-Chromium Playwright session against both dev servers, test data cleaned up after)
+
+* `npx tsc -b tsconfig.app.json` shows only two **pre-existing, unrelated** errors (an unused `toast` import in `authSlice.ts` that predates this change, and an unrelated null-check gap in `DocumentList.tsx`) — nothing introduced by this change fails type-checking.
+* **Mobile OTP login, full browser run**: `/login` → Mobile OTP tab → entered a phone number → "Send OTP" → toast "OTP sent to your mobile number." → OTP-entry step appeared → read the dev-logged code from the server console → "Verify & sign in" → toast "Login successful!" → landed on `/dashboard` showing the auto-created "Mobile User" account, logged in for real (not a mock).
+* **Register phone wiring**: filled name/email/phone/password on `/register`, submitted → "Account created — please sign in." → redirected to `/login`; confirmed via the server's DB that the submitted phone number was actually persisted on the new row (previously silently dropped).
+* Zero browser console errors or page errors across the entire run (checked via Playwright's console listener, not just visual inspection).
+
+---
+
+# 🎨 App-Wide Redesign: Extending the Case File System (Phase 10)
+
+---
+
+## 📌 Overview
+
+Home, Dashboard, Documents, and Legal Assistant were still on a generic dark/purple SaaS template, while Login/Register had a distinct, considered "case file" editorial identity (navy/gold/cream, Fraunces serif, maroon ribbon motif — Phase 8). Rather than design a fourth look, this phase extends that existing system to the rest of the app so it reads as one product, and rebuilds the Home page around real, fully-visible product previews (a real-looking risk report, a real Legal Assistant exchange) instead of generic marketing copy — visitors can see every feature before logging in; login is only required to analyze their own documents. Approved beforehand via an HTML mockup reviewed with the user before touching any real component.
+
+---
+
+## 🔑 What was built
+
+* **Design tokens** (`App.css`): added `risk-high/med/low` bg+fg color pairs (light and dark variants) — deliberately distinct from the `gold` brand accent so a "medium risk" chip is never mistaken for a call-to-action — and a `--font-mono` token (IBM Plex Mono, added to `index.html`'s Google Fonts link) for file tags, risk scores, and timestamps.
+* **`Home.tsx`** — full rewrite: hero opens directly on a live-looking risk report card instead of generic hero art; a "Every feature, in the open" section shows a real risk-report preview (rental-agreement clauses) and a real Legal Assistant exchange (citing the actual *Sushila Aggarwal* case already used elsewhere in the product) side by side, each ending in a plain "Analyze it free" / "Ask NyayMitra" link rather than a blurred paywall teaser; an IPC→BNS/CrPC→BNSS mapping strip and a real 3-step "how it works" sequence follow. Initially used `framer-motion`'s `whileInView` for scroll-reveal on these sections — caught in testing that Playwright's full-page screenshot never triggered the IntersectionObserver, leaving everything below the hero blank. Same risk applies to real users on some scroll/viewport combinations, so scroll-triggered reveal was removed entirely in favor of content that's simply always visible; only the hero keeps a plain mount-time `animate`.
+* **`components/layout/Sidebar.tsx`** — restyled to the navy shell + gold left-bar active state used everywhere now; also absorbed the user avatar/name/logout card that `Dashboard.tsx` previously rendered separately in its own topbar (removing that duplication — `Dashboard.tsx`'s topbar is now just a slim case-file-tag label).
+* **`ThemeToggle.tsx`** — recolored from generic gray to `cream-100`/`navy-800` + gold icon so it matches on every page without needing per-page override classes.
+* **Dashboard/Documents pipeline** (`UploadPanel.tsx`, `DocumentList.tsx`, `ResultPanel.tsx`, `DocumentsPage.tsx`) — restyled only, all data flow/hooks untouched: the upload panel's bare `<input type="file">` became a proper dropzone-style control; document rows get a gold left-bar when selected; risk badges/gauge/flagged-clause cards in `ResultPanel` now use the new semantic risk tokens instead of raw Tailwind `red-600`/`yellow-500`/`green-600`.
+* **Legal Assistant** (`ConversationSidebar`, `ChatWindow`, `EmptyState`, `MessageBubble`, `ClarifyOptions`, `ChatInput`, `AttachedDocumentsBar`, `AttachDocumentModal`, `DocumentViewerModal`) — restyled only; the streaming SSE pipeline, live-caption/MediaRecorder voice input, citation rendering, and audio playback in `useLegalChat.ts`/`sse.ts`/`speechRecognition.ts` were never touched. Assistant bubbles are now solid navy with cream text (previously purple); user bubbles are cream/navy-800; the disclaimer banner uses the new risk-medium tokens instead of raw amber.
+* **Real, pre-existing bug fixed along the way**: `user.controller.ts`'s `register` handler (server-side, see server README) was already swallowing every registration error into a generic 500 — not new to this phase, but it meant no restyle of the Register error box would ever have shown a real message. Left as documented in the server README rather than re-describing here.
+
+---
+
+## ✅ Result (verified with a real headless-Chromium run against both dev servers, light **and** dark, real backend data — not just static screenshots)
+
+* Home, Dashboard (empty state), Documents (empty state), and Legal Assistant (empty state) screenshotted in both color schemes — zero console/page errors in any of the eight captures.
+* Ran a real paste-text analysis end-to-end through the actual UI (not seeded/mocked data): a deliberately landlord-favoring lease produced `riskLevel: High`, `riskScore: 90`, a serif summary quote, an "Important Clauses" list, and "Flagged Clauses" cards with severity/category chips — confirming `ResultPanel`'s new styling renders correctly against real AI output, not just placeholder markup.
+* All test users/documents/analyses created during verification were deleted from the dev database afterward.
+
+---
+
+# 📌 Home Page: Pinned Scroll Reveal + Step Cards (Phase 11)
+
+---
+
+## 📌 Overview
+
+Two refinements to the Phase 10 Home page: the "Every feature, in the open" section now pins to the viewport on desktop while its two preview cards slide in from opposite sides as you scroll, and the "How it works" steps became real cards with fuller descriptions.
+
+---
+
+## 🔑 What was built
+
+* **Pinned scroll reveal** (`Home.tsx::FeaturePreview`): a 160vh-tall section containing a `sticky top-0 h-screen` inner panel. `framer-motion`'s `useScroll` (target = the section, offset `start start → end end`, so progress spans exactly the pinned distance) drives `useTransform` mappings — the risk-report card goes `-60vw → 0`, the legal-assistant card `60vw → 0` — finishing at 70% progress so there's a short settle before the page unpins and normal scrolling resumes. No opacity fade: the cards start fully off-screen, and an earlier opacity mapping just left them looking dim at rest.
+* **Scoped deliberately**: only this section pins (chosen over pinning every section — less to go wrong). **Mobile** (`< md`, via a small `useIsDesktop` matchMedia hook) and **`prefers-reduced-motion`** both render the plain static two-card layout with normal scrolling instead.
+* The two cards were extracted into `RiskReportCard` / `LegalAssistantCard` so the pinned and static layouts share one copy of the markup. The "See it in action" anchor now targets a spot ~45% through the pinned range (an invisible absolutely-positioned `#preview` span) so the jump lands with the cards already in place instead of on an empty pin start.
+* **How it works → cards**: each step is a bordered card with an icon (`UploadCloud` / `ScanSearch` / `MessagesSquare`), a "Step 0N" label, and a 2–3 sentence description. The numbering stays because these really are sequential steps.
+* `App.css`: `html, body, #root { position: relative }` — `useScroll` logs a dev warning unless its scroll container is positioned.
+
+---
+
+## ✅ Result (headless Chromium, 1440×800 desktop + 390×800 mobile, driven by real incremental `scrollTo` — not a full-page screenshot)
+
+* Sampled the pinned range at 0 / 25 / 50 / 75 / 100%: card edges moved `-656 → -347 → -38 → 208` (left card) and `1596 → 1287 → 978 → 732` (right card), settling at the grid position by 75% and staying put through the end of the pin; the next section then scrolls in normally.
+* "See it in action" lands with both cards in place; mobile renders no pinned section at all and shows the stacked static cards.
+* Zero console errors or warnings once the positioned-container fix was in.
+* Lesson recorded: Phase 10's `whileInView` reveal looked broken only because Playwright's `fullPage` screenshot never triggers scroll observers — real incremental scrolling is the right way to test scroll-linked effects.
+
+---
+
+# 🧭 Section Guides + Documents Card Grid (Phase 12)
+
+---
+
+## 📌 Overview
+
+A brand-new user landing on the Dashboard had no way to know what Dashboard, Documents, and Legal Assistant were each *for*. Every in-app section now opens with a header and a short "what this is / what you can do here" guide, and the Documents page was rebuilt as the card grid from the approved mockup, with each card's report opening below the grid.
+
+---
+
+## 🔑 What was built
+
+* **`components/layout/PageIntro.tsx`** — one reusable header: mono eyebrow, serif title, a one-paragraph purpose statement, and three point-cards (icon + short title + one sentence). Open by default so new users see it; a "Hide guide / How this works" toggle collapses it, and the choice is remembered per page in `localStorage` (`intro:<page>`, wrapped in try/catch so blocked storage just means it resets each visit). Used by Dashboard ("Analyze a legal document": add → read the report → find it later), Documents ("Every document you've analyzed"), and Legal Assistant ("Ask a question about Indian law": ask in your own words → answer follow-ups → attach a document). It replaces the Dashboard's old date-only top bar.
+* **`features/document/DocumentGrid.tsx`** (new) + rewritten **`DocumentsPage.tsx`** — responsive card grid (1/2/3/4 columns): file tile, title, `type · date`, and a verdict chip. Chip = `High/Medium/Low risk` once analyzed, else `Not analyzed yet` (or `Analysis failed`), so no card is ever status-less. The selected card gets a gold border; clicking a card runs the existing `runAnalysis` (cached results return instantly) and smooth-scrolls to an "Analysis report" section directly under the grid, where the existing `ResultPanel` renders. Empty state links to the Dashboard. The old two-column list + side-panel layout on this page is gone; the compact `DocumentList` is still used on the Dashboard.
+* **`features/document/riskStyles.ts`** — the High/Medium/Low chip classes were extracted from `ResultPanel.tsx` so the grid and the report can't drift apart.
+
+---
+
+## ✅ Result (headless Chromium, light + dark, with a seeded throwaway user)
+
+* Grid chips read `["Not analyzed yet","High risk","Low risk","Medium risk"]` straight from the API for four seeded documents; clicking the lease card marked it selected, opened the full report (score 90, summary quote) below the grid.
+* Collapsing the guide and reloading kept it collapsed; zero console errors/warnings across Dashboard, Documents, and Legal Assistant in both themes. Test user and documents were deleted afterward.
+
+---
+
+# 🚪 Logout Goes to the Home Page (Phase 13)
+
+---
+
+## 📌 Overview
+
+Logging out was supposed to land on the public home page (so the visitor can see the marketing site again), but `Sidebar.tsx`'s `navigate("/")` never won: users ended up on `/login`.
+
+---
+
+## 🔑 Root cause and fix
+
+* `logout()` removes the token, which re-renders the still-mounted protected page. `ProtectedRoute` sees no token and renders `<Navigate to="/login">`, whose redirect fires *after* the sidebar's `navigate("/")` — a real logged-in run showed the path trail `["/", "/login"]`. Reordering `dispatch`/`navigate` is not a reliable fix (router navigation is a deferred transition, so the guard can still render once at the old location).
+* `authSlice.ts` gained a `loggedOut` flag: set by `logout`, cleared on `loginUser`/`verifyOtp`/`fetchCurrentUser` success (the last also covers Google login). It starts `false`, so it is never set on a fresh page load.
+* `ProtectedRoute.tsx` reads it: no token + `loggedOut` → `/` ; no token otherwise → `/login`. Both redirects now use `replace`. `Sidebar.tsx` keeps `navigate("/", { replace: true })` so the Back button can't return to a protected page.
+
+---
+
+## ✅ Result (real login through the form, real backend, headless Chromium)
+
+* Logout from Dashboard, Documents, and Legal Assistant each lands on `/` with the home page visible; signing back in after a logout works each time.
+* Regressions checked: opening `/dashboard` with no token still redirects to `/login`, and a logged-out user who reloads and opens `/documents` also goes to `/login`. No page errors. Test user deleted afterward.
+* Testing note: a fake `localStorage` token did **not** reproduce the bug (the user never loaded, so the timing differed) — only a real login did.
+
+---

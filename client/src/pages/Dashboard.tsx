@@ -1,8 +1,9 @@
+import { UploadCloud, ScanSearch, FolderOpen } from "lucide-react";
 import Sidebar from "../components/layout/Sidebar";
+import PageIntro from "../components/layout/PageIntro";
 import UploadPanel from "../features/document/UploadPanel";
 import DocumentList from "./DocumentList";
 import ResultPanel from "./ResultPanel";
-import { useSelector } from "react-redux";
 import { useDocumentAnalysis } from "../features/document/useDocumentAnalysis";
 
 export default function Dashboard() {
@@ -15,30 +16,22 @@ export default function Dashboard() {
     handleUploaded,
   } = useDocumentAnalysis();
 
-  const user = useSelector((state: any) => state.auth.user);
-
-  const userInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
-
   return (
-    <div className="flex h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-white">
+    <div className="flex h-screen bg-cream-50 dark:bg-navy-950 text-navy-950 dark:text-cream-50">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col">
-        {/* 🔹 Top Bar */}
-        <div className="flex justify-end items-center p-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            {/* Avatar */}
-            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white">
-              {userInitial}
-            </div>
-
-            {/* Name */}
-            <div className="text-sm">
-              <p className="font-semibold">{user?.name || "User"}</p>
-              <p className="text-gray-500 dark:text-gray-400 text-xs">Welcome back</p>
-            </div>
-          </div>
-        </div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <PageIntro
+          storageKey="dashboard"
+          eyebrow="Case workspace"
+          title="Analyze a legal document"
+          description="Start here. Upload a lease, notice, FIR or contract — or paste its text — and NyayMitra reads every clause, scores the risk, and explains in plain language what to watch out for."
+          points={[
+            { icon: UploadCloud, title: "1. Add a document", text: "Upload a PDF or paste text (at least 50 characters) on the left." },
+            { icon: ScanSearch, title: "2. Read the report", text: "The risk score, summary and flagged clauses appear on the right in a few seconds." },
+            { icon: FolderOpen, title: "3. Find it later", text: "Every analysis is saved — reopen it any time from Documents." },
+          ]}
+        />
 
         {/* 🔹 Main Content */}
         <div className="flex-1 min-h-0 p-6 grid grid-cols-2 gap-6">

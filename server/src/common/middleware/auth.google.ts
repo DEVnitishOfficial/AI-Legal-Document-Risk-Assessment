@@ -12,7 +12,7 @@ try {
       {
         clientID: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
-        callbackURL: "http://localhost:3000/api/v1/auth/google/callback", // this url consist the code that google sends back after successful login, we will exchange that code for access token and user info
+        callbackURL: `${env.SERVER_URL}/api/v1/auth/google/callback`, // this url consist the code that google sends back after successful login, we will exchange that code for access token and user info
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
@@ -32,11 +32,11 @@ try {
           //2. If not found → create user
           if (!user) {
             // Google users don't need password → store random string
-            user = await userRepo.createUser(
+            user = await userRepo.createUser({
               name,
               email,
-              "GOOGLE_AUTH_USER",
-            );
+              password: "GOOGLE_AUTH_USER",
+            });
           }
           console.log("User created or found:", user);
 

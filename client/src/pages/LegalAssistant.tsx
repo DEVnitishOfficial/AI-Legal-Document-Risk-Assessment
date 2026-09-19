@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { MessageSquareText, ListChecks, Paperclip } from "lucide-react";
 import Sidebar from "../components/layout/Sidebar";
+import PageIntro from "../components/layout/PageIntro";
 import ConversationSidebar from "../features/legal-agent/ConversationSidebar";
 import ChatWindow from "../features/legal-agent/ChatWindow";
 import ChatInput from "../features/legal-agent/ChatInput";
@@ -29,7 +31,7 @@ export default function LegalAssistant() {
     const [viewingDocumentId, setViewingDocumentId] = useState<number | null>(null);
 
     return (
-        <div className="flex h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-white">
+        <div className="flex h-screen bg-cream-50 dark:bg-navy-950 text-navy-950 dark:text-cream-50">
             <Sidebar />
 
             <ConversationSidebar
@@ -40,6 +42,18 @@ export default function LegalAssistant() {
             />
 
             <div className="flex-1 flex flex-col min-h-0">
+                <PageIntro
+                    storageKey="legal-assistant"
+                    eyebrow="Legal assistant"
+                    title="Ask a question about Indian law"
+                    description="Describe a legal problem — a bank fraud, a rental dispute, a police case — and get your options explained in plain language, with sources. It gives general information, not legal advice."
+                    points={[
+                        { icon: MessageSquareText, title: "Ask in your own words", text: "Type it, or tap the mic. English and Hindi both work." },
+                        { icon: ListChecks, title: "Answer a few follow-ups", text: "If your situation is unclear, it asks short questions before advising." },
+                        { icon: Paperclip, title: "Attach a document", text: "Use the paperclip so answers are based on your actual lease or notice." },
+                    ]}
+                />
+
                 <ChatWindow
                     messages={messages}
                     loading={loadingMessages}

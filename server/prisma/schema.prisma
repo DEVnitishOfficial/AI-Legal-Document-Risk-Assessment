@@ -10,7 +10,8 @@ datasource db {
 model User {
   id        Int        @id @default(autoincrement())
   name      String
-  email     String     @unique
+  email     String?    @unique
+  phone     String?    @unique
   password  String
   createdAt DateTime   @default(now()) @map("created_at")
 
@@ -18,6 +19,20 @@ model User {
   conversations Conversation[]
 
   @@map("users")
+}
+
+model OtpVerification {
+  id         Int      @id @default(autoincrement())
+  phone      String
+  codeHash   String   @map("code_hash")
+  expiresAt  DateTime @map("expires_at")
+  attempts   Int      @default(0)
+  consumed   Boolean  @default(false)
+  lastSentAt DateTime @default(now()) @map("last_sent_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@map("otp_verifications")
 }
 
 model Document {

@@ -83,27 +83,27 @@ export default function MessageBubble({ message, isStreaming }: MessageBubblePro
         >
             <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                    isUser ? "bg-gray-300 dark:bg-gray-700" : "bg-purple-600"
+                    isUser ? "bg-cream-200 dark:bg-navy-700" : "bg-navy-950 dark:bg-gold-500"
                 }`}
             >
                 {isUser ? (
-                    <User size={16} className="text-gray-700 dark:text-gray-200" />
+                    <User size={16} className="text-navy-800 dark:text-cream-200" />
                 ) : (
-                    <Scale size={16} className="text-white" />
+                    <Scale size={16} className="text-gold-400 dark:text-navy-950" />
                 )}
             </div>
 
             <div
                 className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     isUser
-                        ? "bg-purple-600 text-white rounded-tr-sm"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-sm"
+                        ? "bg-cream-100 dark:bg-navy-800 text-navy-950 dark:text-cream-50 rounded-tr-sm"
+                        : "bg-navy-950 dark:bg-navy-900 dark:border dark:border-white/10 text-cream-100 rounded-tl-sm"
                 }`}
             >
                 {message.kind === "voice" && (
                     <div
                         className={`flex items-center gap-1 text-xs mb-1 ${
-                            isUser ? "text-purple-100" : "text-gray-500 dark:text-gray-400"
+                            isUser ? "text-navy-800/60 dark:text-cream-100/50" : "text-cream-100/50"
                         }`}
                     >
                         <Mic size={11} /> Voice message
@@ -116,8 +116,8 @@ export default function MessageBubble({ message, isStreaming }: MessageBubblePro
                 )}
 
                 {message.citations && message.citations.length > 0 && (
-                    <div className="mt-3 pt-2 border-t border-black/10 dark:border-white/10">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1.5">
+                    <div className="mt-3 pt-2 border-t border-white/10">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-cream-100/40 mb-1.5">
                             Sources
                         </p>
                         <div className="space-y-1">
@@ -131,13 +131,13 @@ export default function MessageBubble({ message, isStreaming }: MessageBubblePro
                                 >
                                     <ExternalLink
                                         size={11}
-                                        className="mt-0.5 shrink-0 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-300 transition"
+                                        className="mt-0.5 shrink-0 text-cream-100/40 group-hover:text-gold-400 transition-colors"
                                     />
                                     <span className="min-w-0">
-                                        <span className="block text-xs text-purple-700 dark:text-purple-300 group-hover:underline truncate">
+                                        <span className="block text-xs text-gold-400 group-hover:underline truncate">
                                             {c.title}
                                         </span>
-                                        <span className="block text-[10px] text-gray-400 dark:text-gray-500 truncate">
+                                        <span className="block text-[10px] text-cream-100/40 truncate">
                                             {hostnameOf(c.url)}
                                         </span>
                                     </span>
@@ -150,16 +150,16 @@ export default function MessageBubble({ message, isStreaming }: MessageBubblePro
                 {!isStreaming && (
                     <div
                         className={`mt-2 flex items-center gap-3 text-xs ${
-                            isUser ? "text-purple-100" : "text-gray-500 dark:text-gray-400"
+                            isUser ? "text-navy-800/50 dark:text-cream-100/40" : "text-cream-100/40"
                         }`}
                     >
                         <button
                             onClick={handleCopy}
                             title="Copy message"
-                            className={`flex items-center gap-1 transition ${
+                            className={`flex items-center gap-1 transition-colors ${
                                 isUser
-                                    ? "hover:text-white"
-                                    : "hover:text-purple-600 dark:hover:text-purple-300"
+                                    ? "hover:text-navy-950 dark:hover:text-white"
+                                    : "hover:text-gold-400"
                             }`}
                         >
                             {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -170,7 +170,7 @@ export default function MessageBubble({ message, isStreaming }: MessageBubblePro
                             <button
                                 onClick={togglePlayback}
                                 title={playback === "playing" ? "Pause" : "Listen to this reply"}
-                                className="flex items-center gap-1 hover:text-purple-600 dark:hover:text-purple-300 transition"
+                                className="flex items-center gap-1 hover:text-gold-400 transition-colors"
                             >
                                 {playback === "loading" ? (
                                     <Loader2 size={13} className="animate-spin" />

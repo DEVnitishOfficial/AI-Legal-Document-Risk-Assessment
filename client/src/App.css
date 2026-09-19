@@ -1,3 +1,55 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Editorial "case file" palette — used by the auth pages (Login/Register).
+   Scoped as theme tokens rather than one-off hex values so the look stays
+   consistent if more pages adopt it later. */
+@theme {
+  --color-navy-950: #0a0f1e;
+  --color-navy-900: #10182c;
+  --color-navy-800: #182140;
+  --color-navy-700: #223055;
+  --color-navy-600: #304374;
+
+  --color-gold-400: #e3c583;
+  --color-gold-500: #d4af61;
+  --color-gold-600: #b8933f;
+
+  --color-cream-50: #fbf7ee;
+  --color-cream-100: #f6efdd;
+  --color-cream-200: #ede1c4;
+
+  --color-maroon-700: #7a2e2e;
+  --color-maroon-800: #5f2323;
+
+  /* Risk severity — deliberately distinct from the gold brand accent so a
+     "medium risk" chip is never mistaken for a CTA. Light-mode values only;
+     components pick the dark-mode pair via `dark:` variants since Tailwind
+     v4 @theme tokens can't branch on color-scheme themselves. */
+  --color-risk-high-bg: #f7e0dd;
+  --color-risk-high-fg: #8a2f28;
+  --color-risk-med-bg: #f6e6cf;
+  --color-risk-med-fg: #8a5b16;
+  --color-risk-low-bg: #e2ecdf;
+  --color-risk-low-fg: #3c6248;
+
+  --color-risk-high-bg-dark: #351916;
+  --color-risk-high-fg-dark: #f0a89e;
+  --color-risk-med-bg-dark: #362a10;
+  --color-risk-med-fg-dark: #e9c179;
+  --color-risk-low-bg-dark: #16281d;
+  --color-risk-low-fg-dark: #9bcbab;
+
+  --font-display: "Fraunces", "Georgia", serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+/* framer-motion's useScroll (used by the Home page's pinned section) needs a
+   positioned scroll container to compute offsets correctly. */
+html,
+body,
+#root {
+  position: relative;
+}

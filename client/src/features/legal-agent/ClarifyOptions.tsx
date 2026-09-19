@@ -24,7 +24,7 @@ export default function ClarifyOptions({ options, onSelect, disabled }: ClarifyO
                     key={opt}
                     disabled={disabled}
                     onClick={() => onSelect(opt)}
-                    className="px-4 py-2 rounded-full border border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100 dark:border-purple-700 dark:text-purple-300 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 text-sm transition disabled:opacity-50"
+                    className="px-4 py-2 rounded-full border border-gold-500/40 text-gold-700 bg-gold-500/10 hover:bg-gold-500/20 dark:text-gold-400 dark:border-gold-500/30 text-sm transition-colors disabled:opacity-50"
                 >
                     {opt}
                 </button>
@@ -34,7 +34,7 @@ export default function ClarifyOptions({ options, onSelect, disabled }: ClarifyO
                 <button
                     disabled={disabled}
                     onClick={() => setShowOther(true)}
-                    className="px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 text-sm transition disabled:opacity-50"
+                    className="px-4 py-2 rounded-full border border-cream-200 dark:border-white/15 text-gray-500 dark:text-cream-100/50 hover:bg-cream-100 dark:hover:bg-white/5 text-sm transition-colors disabled:opacity-50"
                 >
                     Other
                 </button>
@@ -46,11 +46,11 @@ export default function ClarifyOptions({ options, onSelect, disabled }: ClarifyO
                         onChange={(e) => setOtherText(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && submitOther()}
                         placeholder="Type your own answer..."
-                        className="flex-1 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none"
+                        className="flex-1 px-3 py-2 rounded-lg bg-cream-100 dark:bg-navy-800 text-navy-950 dark:text-white text-sm outline-none"
                     />
                     <button
                         onClick={submitOther}
-                        className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm"
+                        className="px-4 py-2 rounded-lg bg-navy-900 dark:bg-gold-500 text-cream-50 dark:text-navy-950 text-sm font-semibold"
                     >
                         Send
                     </button>

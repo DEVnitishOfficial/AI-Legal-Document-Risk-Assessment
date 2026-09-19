@@ -211,28 +211,28 @@ export default function ChatInput({
             : "Recording...";
 
     return (
-        <div className="border-t border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex items-end gap-2 bg-gray-100 dark:bg-gray-900 rounded-2xl p-2 max-w-3xl mx-auto">
+        <div className="border-t border-cream-200 dark:border-white/10 p-4">
+            <div className="flex items-end gap-2 bg-cream-100 dark:bg-navy-900 border border-cream-200 dark:border-white/10 rounded-2xl p-2 max-w-3xl mx-auto">
                 <button
                     onClick={onAttachClick}
                     disabled={isRecording}
                     title="Attach a document"
-                    className="p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 transition shrink-0 disabled:opacity-40"
+                    className="p-2 rounded-full text-gray-500 hover:bg-cream-200 dark:text-cream-100/50 dark:hover:bg-navy-800 transition-colors shrink-0 disabled:opacity-40"
                 >
                     <Paperclip size={18} />
                 </button>
 
                 <div className="flex-1 flex flex-col min-w-0">
                     {(isRecording || isTranscribing) && (
-                        <div className="flex items-center gap-1.5 px-1 pt-1 text-xs text-red-600 dark:text-red-400">
+                        <div className="flex items-center gap-1.5 px-1 pt-1 text-xs text-risk-high-fg dark:text-risk-high-fg-dark">
                             {isTranscribing ? (
                                 <Loader2 size={11} className="animate-spin" />
                             ) : (
-                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
                             )}
                             {statusLabel}
                             {isRecording && (
-                                <span className="text-gray-400 dark:text-gray-500">
+                                <span className="text-gray-400 dark:text-cream-100/40">
                                     {formatSeconds(recordSeconds)}
                                 </span>
                             )}
@@ -252,7 +252,7 @@ export default function ChatInput({
                             language === "hi" ? "अपना सवाल यहाँ लिखें..." : "Ask about your legal situation..."
                         }
                         rows={1}
-                        className="flex-1 resize-none bg-transparent outline-none text-sm text-gray-900 dark:text-white placeholder:text-gray-400 py-2 max-h-32"
+                        className="flex-1 resize-none bg-transparent outline-none text-sm text-navy-950 dark:text-white placeholder:text-gray-400 dark:placeholder:text-cream-100/35 py-2 max-h-32"
                     />
                 </div>
 
@@ -260,10 +260,10 @@ export default function ChatInput({
                     onClick={isRecording ? stopRecording : startRecording}
                     disabled={disabled || isTranscribing}
                     title={isRecording ? "Stop recording" : "Speak your question"}
-                    className={`p-2 rounded-full transition shrink-0 disabled:opacity-40 ${
+                    className={`p-2 rounded-full transition-colors shrink-0 disabled:opacity-40 ${
                         isRecording
-                            ? "bg-red-500 text-white hover:bg-red-600"
-                            : "text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800"
+                            ? "bg-risk-high-fg dark:bg-risk-high-fg-dark text-white dark:text-navy-950"
+                            : "text-gray-500 hover:bg-cream-200 dark:text-cream-100/50 dark:hover:bg-navy-800"
                     }`}
                 >
                     {isRecording ? <Square size={16} /> : <Mic size={18} />}
@@ -273,7 +273,7 @@ export default function ChatInput({
                     onClick={() => onLanguageChange(language === "en" ? "hi" : "en")}
                     disabled={isRecording}
                     title="Switch response language"
-                    className="flex items-center gap-1 px-3 py-2 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-800 transition shrink-0 disabled:opacity-40"
+                    className="flex items-center gap-1 px-3 py-2 rounded-full text-xs font-mono font-medium text-gray-500 hover:bg-cream-200 dark:text-cream-100/60 dark:hover:bg-navy-800 transition-colors shrink-0 disabled:opacity-40"
                 >
                     <Languages size={14} />
                     {language === "en" ? "EN" : "हिं"}
@@ -282,7 +282,7 @@ export default function ChatInput({
                 <button
                     onClick={submit}
                     disabled={disabled || isRecording || isTranscribing || !value.trim()}
-                    className="p-2.5 rounded-full bg-purple-600 text-white disabled:opacity-40 transition shrink-0"
+                    className="p-2.5 rounded-full bg-navy-900 dark:bg-gold-500 text-cream-50 dark:text-navy-950 disabled:opacity-40 transition-colors shrink-0"
                 >
                     <Send size={16} />
                 </button>
