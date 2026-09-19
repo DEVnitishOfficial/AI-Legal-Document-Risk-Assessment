@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import './App.css'
 import ProtectedRoute from './routes/ProtectedRoute'
+import AdminRoute from './routes/AdminRoute'
+import AdvocatesAdminPage from './pages/admin/AdvocatesAdminPage'
 import Dashboard from './pages/Dashboard'
 import OAuthSuccess from './pages/OAuthSuccess'
 import { Toaster } from 'react-hot-toast'
@@ -64,6 +66,14 @@ function App () {
             <ProtectedRoute>
               <LegalAssistant />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/admin/advocates'
+          element={
+            <AdminRoute>
+              <AdvocatesAdminPage />
+            </AdminRoute>
           }
         />
       </Routes>
