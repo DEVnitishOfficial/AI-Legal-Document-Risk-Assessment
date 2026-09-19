@@ -13,10 +13,12 @@ model User {
   email     String?    @unique
   phone     String?    @unique
   password  String
+  role      UserRole   @default(USER)
   createdAt DateTime   @default(now()) @map("created_at")
 
   documents     Document[]
   conversations Conversation[]
+  consultations Consultation[]
 
   @@map("users")
 }
@@ -112,17 +114,205 @@ model ConversationDocument {
   @@map("conversation_documents")
 }
 
-model LegalKnowledgeChunk {
-  id          Int       @id @default(autoincrement())
-  sourceUrl   String    @map("source_url")
-  sourceTitle String    @map("source_title")
-  act         String?
-  section     String?
-  content     String
-  embedding   Unsupported("vector(1536)")
-  publishedAt DateTime? @map("published_at")
-  crawledAt   DateTime  @default(now()) @map("crawled_at")
-  contentHash String    @unique @map("content_hash")
+// Where a knowledge chunk came from. Advocate retrieval only uses the GOV_*
+// types; AGGREGATOR (e.g. Indian Kanoon) is kept for the document chat only.
+enum KnowledgeSourceType {
+  GOV_STATUTE
+  GOV_JUDGMENT
+  GOV_GAZETTE
+  AGGREGATOR
+}
 
+model LegalKnowledgeChunk {
+  id             Int                 @id @default(autoincrement())
+  sourceUrl      String              @map("source_url")
+  sourceTitle    String              @map("source_title")
+  act            String?
+  section        String?
+  content        String
+  embedding      Unsupported("vector(1536)")
+  publishedAt    DateTime?           @map("published_at")
+  crawledAt      DateTime            @default(now()) @map("crawled_at")
+  contentHash    String              @unique @map("content_hash")
+  // Grounding metadata
+  sourceType     KnowledgeSourceType @default(AGGREGATOR) @map("source_type")
+  sourceDomain   String?             @map("source_domain")
+  jurisdiction   String              @default("IN")
+  actShort       String?             @map("act_short")
+  sectionHeading String?             @map("section_heading")
+  language       String              @default("en")
+  effectiveFrom  DateTime?           @map("effective_from")
+  effectiveTo    DateTime?           @map("effective_to")
+
+  @@index([sourceType, jurisdiction])
+  @@index([actShort, section])
   @@map("legal_knowledge_chunks")
+}
+
+// ── Advocates (AI and human share one profile structure) ─────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AdvocateKind {
+  AI
+  HUMAN
+}
+
+enum AdvocateStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+// HUMAN advocates use ENROLMENT/DEGREE/CERTIFICATION/BAR_MEMBERSHIP.
+// The AI advocate uses KNOWLEDGE_SOURCE/SCOPE/LAST_VERIFIED — never invented
+// degrees or bar numbers.
+enum CredentialType {
+  ENROLMENT
+  DEGREE
+  CERTIFICATION
+  BAR_MEMBERSHIP
+  KNOWLEDGE_SOURCE
+  SCOPE
+  LAST_VERIFIED
+}
+
+model Advocate {
+  id                     Int                @id @default(autoincrement())
+  kind                   AdvocateKind
+  displayName            String             @map("display_name")
+  slug                   String             @unique
+  photoUrl               String?            @map("photo_url")
+  headline               String?
+  bio                    String?
+  languages              String[]           @default([])
+  practiceAreas          String[]           @default([]) @map("practice_areas")
+  courts                 String[]           @default([])
+  statesCovered          String[]           @default([]) @map("states_covered")
+  yearsExperience        Int?               @map("years_experience")
+  status                 AdvocateStatus     @default(DRAFT)
+  verificationStatus     VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verifiedAt             DateTime?          @map("verified_at")
+  verifiedById           Int?               @map("verified_by_id")
+  acceptingConsultations Boolean            @default(false) @map("accepting_consultations")
+  sortOrder              Int                @default(0) @map("sort_order")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  credentials AdvocateCredential[]
+  aiConfig    AdvocateAiConfig?
+  consultations Consultation[]
+
+  @@map("advocates")
+}
+
+model AdvocateCredential {
+  id          Int            @id @default(autoincrement())
+  advocateId  Int            @map("advocate_id")
+  type        CredentialType
+  title       String
+  issuer      String?
+  year        Int?
+  identifier  String?
+  documentUrl String?        @map("document_url")
+  verified    Boolean        @default(false)
+  sortOrder   Int            @default(0) @map("sort_order")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  advocate Advocate @relation(fields: [advocateId], references: [id], onDelete: Cascade)
+
+  @@index([advocateId])
+  @@map("advocate_credentials")
+}
+
+model AdvocateAiConfig {
+  id                Int      @id @default(autoincrement())
+  advocateId        Int      @unique @map("advocate_id")
+  provider          String   @default("openai")
+  model             String
+  voice             String   @default("alloy")
+  temperature       Float    @default(0.8)
+  personaPrompt     String   @default("") @map("persona_prompt")
+  maxSessionMinutes Int      @default(20) @map("max_session_minutes")
+  ragConfig         Json     @default("{}") @map("rag_config")
+  version           Int      @default(1)
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  advocate Advocate @relation(fields: [advocateId], references: [id], onDelete: Cascade)
+
+  @@map("advocate_ai_configs")
+}
+
+// ── Consultations (live sessions with an advocate) ───────────────────────
+
+enum ConsultationStatus {
+  LOBBY
+  LIVE
+  ENDED
+  FAILED
+}
+
+enum TurnSpeaker {
+  USER
+  ADVOCATE
+  SYSTEM
+}
+
+model Consultation {
+  id              Int                @id @default(autoincrement())
+  userId          Int                @map("user_id")
+  // Kept (SET NULL) if the advocate is later deleted, so a saved consultation
+  // never disappears; the advocate name is snapshotted for display.
+  advocateId      Int?               @map("advocate_id")
+  advocateName    String             @map("advocate_name")
+  state           String
+  language        String
+  status          ConsultationStatus @default(LOBBY)
+  consentAt       DateTime           @map("consent_at")
+  model           String?
+  aiConfigVersion Int?               @map("ai_config_version")
+  callId          String?            @map("call_id")
+  startedAt       DateTime?          @map("started_at")
+  endedAt         DateTime?          @map("ended_at")
+  durationSec     Int                @default(0) @map("duration_sec")
+  endReason       String?            @map("end_reason")
+  usage           Json?
+  summary         Json?
+  summaryStatus   String             @default("NONE") @map("summary_status")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  advocate Advocate?          @relation(fields: [advocateId], references: [id], onDelete: SetNull)
+  turns    ConsultationTurn[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("consultations")
+}
+
+model ConsultationTurn {
+  id             Int         @id @default(autoincrement())
+  consultationId Int         @map("consultation_id")
+  speaker        TurnSpeaker
+  // SPEECH = transcribed talk, SEARCH = a law lookup the advocate ran, NOTICE = system message
+  kind           String      @default("SPEECH")
+  text           String
+  // ADVOCATE speech: every "Section N of Act" mentioned, with its verification status.
+  // SEARCH: the passages retrieved (citation, source URL, similarity).
+  citations      Json?
+  atMs           Int         @default(0) @map("at_ms")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  @@index([consultationId, id])
+  @@map("consultation_turns")
 }
