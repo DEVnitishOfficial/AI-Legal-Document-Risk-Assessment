@@ -1,14 +1,18 @@
 import { Router } from "express";
 import { authMiddleware } from "../../common/middleware/auth.middleware";
+import { requireAdmin } from "../../common/middleware/admin.middleware";
 import { aiRateLimiter } from "../../common/middleware/rateLimit.middleware";
-import { runIngest, getIngestStatus } from "./rag.controller";
+import { runIngest, getIngestStatus, runStatuteIngest, getStatuteStatus } from "./rag.controller";
 
 const router = Router();
 
-// authMiddleware just proves the caller is a logged-in user; the real gate
-// is the x-ingest-secret header check inside runIngest (no admin/role
-// system exists yet, so a shared secret is the pragmatic stand-in).
-router.post("/ingest", authMiddleware, aiRateLimiter, runIngest);
+// Ingestion spends Firecrawl/OpenAI credits, so it is admin-only. (Replaces the
+// old shared x-ingest-secret header, which existed before roles did.)
+router.post("/ingest", authMiddleware, requireAdmin, aiRateLimiter, runIngest);
 router.get("/status", authMiddleware, getIngestStatus);
+
+// Official central-law statutes (BNS/BNSS/BSA…) that ground the AI advocate.
+router.post("/ingest-statutes", authMiddleware, requireAdmin, aiRateLimiter, runStatuteIngest);
+router.get("/statutes", authMiddleware, requireAdmin, getStatuteStatus);
 
 export default router;
