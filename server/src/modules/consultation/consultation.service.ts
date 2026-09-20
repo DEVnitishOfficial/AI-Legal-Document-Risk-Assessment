@@ -1,38 +1,28 @@
 import { AppError } from "../../common/errors/AppError";
 import { env } from "../../config/env";
 import * as advocates from "../advocate/advocate.repository";
+import { findUserById } from "../user/user.repository";
 import { DEFAULT_RAG } from "../rag/rag.grounded";
 import { summariseStatutes } from "../rag/rag.repository";
 import * as repo from "./consultation.repository";
 import { buildSessionConfig, endSession, isLive, negotiateCall, recoverStaleSessions, startSession } from "./consultation.realtime";
 import { buildInstructions } from "./consultation.prompt";
+import { toPublic } from "./consultation.shape";
 import { CONSULT_LANGUAGES, ConsultLanguage, INDIAN_STATES, STALE_LOBBY_MS } from "./consultation.constants";
 
 type Consultation = NonNullable<Awaited<ReturnType<typeof repo.findConsultation>>>;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const limitSecOf = (c: Consultation): number | null => {
-    const usage = c.usage as { limitSec?: number } | null;
-    return typeof usage?.limitSec === "number" ? usage.limitSec : null;
+// The account name is user-typed text that ends up in the model's instructions,
+// so only a single plain first name is allowed through — anything else (digits,
+// punctuation, a sentence) is dropped rather than risk instructions in a name.
+const safeFirstName = (name?: string | null): string | null => {
+    const first = name?.trim().split(/\s+/)[0] ?? "";
+    return /^\p{L}[\p{L}'’-]{0,29}$/u.test(first) ? first : null;
 };
 
-export const toPublic = (c: Consultation, withSummary = false) => ({
-    id: c.id,
-    advocate: { id: c.advocateId, name: c.advocateName },
-    state: c.state,
-    stateName: INDIAN_STATES[c.state] ?? c.state,
-    language: c.language,
-    status: c.status,
-    startedAt: c.startedAt,
-    endedAt: c.endedAt,
-    durationSec: c.durationSec,
-    endReason: c.endReason,
-    limitSec: limitSecOf(c),
-    summaryStatus: c.summaryStatus,
-    createdAt: c.createdAt,
-    ...(withSummary ? { summary: c.summary } : {}),
-});
+export { toPublic };
 
 const getOwned = async (userId: number, id: number): Promise<Consultation> => {
     if (!Number.isInteger(id)) throw new AppError("Invalid consultation id", 400);
@@ -72,7 +62,7 @@ export const createConsultation = async (
     const advocate = await advocates.findAdvocateById(advocateId);
     if (!advocate || advocate.status !== "ACTIVE") throw new AppError("This advocate is not available", 404);
     if (advocate.kind !== "AI" || !advocate.aiConfig) {
-        throw new AppError("Consultations with human advocates are not available yet", 400);
+        throw new AppError("This is a human advocate — use Request consultation instead.", 400);
     }
     if (!advocate.acceptingConsultations) throw new AppError("This advocate is not accepting consultations right now", 409);
 
@@ -81,7 +71,7 @@ export const createConsultation = async (
     await repo.failStaleLobbies(new Date(Date.now() - STALE_LOBBY_MS));
 
     const open = await repo.findOpenConsultationForUser(userId);
-    if (open?.status === "LIVE") {
+    if (open?.status === "LIVE" || open?.status === "REQUESTED" || open?.status === "ACCEPTED") {
         throw new AppError("You already have a consultation in progress. End it before starting another.", 409);
     }
     // A lobby the user walked away from is replaced, not blocked on.
@@ -109,6 +99,7 @@ export const createConsultation = async (
 
 export const connect = async (userId: number, id: number, sdp: unknown) => {
     const c = await getOwned(userId, id);
+    if (c.advocateKind === "HUMAN") throw new AppError("This is a call with a human advocate", 400);
     if (c.status !== "LOBBY") throw new AppError("This consultation can no longer be joined", 409);
     if (typeof sdp !== "string" || !sdp.startsWith("v=0") || sdp.length > 100_000) {
         throw new AppError("Invalid connection offer", 400);
@@ -127,6 +118,7 @@ export const connect = async (userId: number, id: number, sdp: unknown) => {
     const rag = (cfg.ragConfig as { k?: number; minSimilarity?: number } | null) ?? {};
     const language = c.language as ConsultLanguage;
     const loaded = await summariseStatutes();
+    const user = await findUserById(userId);
 
     const params = {
         consultationId: c.id,
@@ -145,6 +137,7 @@ export const connect = async (userId: number, id: number, sdp: unknown) => {
             today: new Date().toISOString().slice(0, 10),
             loadedActs: loaded.map((a) => ({ actShort: a.actShort, actName: a.act ?? a.actShort })),
             persona: cfg.personaPrompt,
+            clientName: safeFirstName(user?.name),
         }),
     };
 
@@ -176,6 +169,7 @@ export const connect = async (userId: number, id: number, sdp: unknown) => {
 
 export const endConsultation = async (userId: number, id: number) => {
     let c = await getOwned(userId, id);
+    if (c.advocateKind === "HUMAN") throw new AppError("This is a call with a human advocate", 400);
 
     if (c.status === "LIVE") {
         if (isLive(c.id)) await endSession(c.id, "user_ended");
@@ -199,6 +193,8 @@ export const getTurns = async (userId: number, id: number, afterId: number) => {
 
 export const deleteConsultation = async (userId: number, id: number) => {
     const c = await getOwned(userId, id);
-    if (c.status === "LIVE") throw new AppError("End the consultation before deleting it", 409);
+    if (c.status === "LIVE" || c.status === "REQUESTED" || c.status === "ACCEPTED") {
+        throw new AppError("End or cancel the consultation before deleting it", 409);
+    }
     await repo.deleteConsultation(id);
 };

@@ -28,3 +28,6 @@ adminAdvocateRoutes.put("/:id/ai-config", c.adminUpdateAiConfig);
 
 adminAdvocateRoutes.post("/:id/photo", advocatePhotoUpload, c.adminSetPhoto);
 adminAdvocateRoutes.delete("/:id/photo", c.adminRemovePhoto);
+
+adminAdvocateRoutes.put("/:id/account", c.adminLinkAccount);
+adminAdvocateRoutes.delete("/:id/account", c.adminUnlinkAccount);

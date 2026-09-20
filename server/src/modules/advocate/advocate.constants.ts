@@ -47,7 +47,7 @@ export const DEFAULT_AI_PROFILE = {
 export const DEFAULT_AI_CONFIG = {
   provider: "openai",
   model: "gpt-realtime",
-  voice: "alloy",
+  voice: "marin", // one of the two Realtime-native voices; the most natural-sounding
   temperature: 0.8,
   personaPrompt: "",
   maxSessionMinutes: 20,

@@ -69,6 +69,8 @@ export const adminShape = (a: AdvocateRecord) => ({
   status: a.status,
   sortOrder: a.sortOrder,
   aiConfig: a.aiConfig,
+  // Admin only: the login account this (human) advocate uses for their Advocate Desk.
+  account: a.user ? { id: a.user.id, email: a.user.email, name: a.user.name } : null,
   createdAt: a.createdAt,
   updatedAt: a.updatedAt,
 });
@@ -370,4 +372,37 @@ export const syncAiKnowledgeCredentials = async (
 
   const advocates = await repo.listAdvocates({ kind: "AI" });
   for (const a of advocates) await repo.replaceAutoCredentials(a.id, rows);
+};
+
+// ── Advocate login account ───────────────────────────────────────────────────
+// A human advocate reaches their Advocate Desk with their own NyayMitra account;
+// the admin links that account to the profile by email.
+
+export const linkAccount = async (advocateId: number, emailRaw: unknown) => {
+  const a = await getOrThrow(advocateId);
+  if (a.kind !== "HUMAN") throw new AppError("Only human advocates have a login account", 400);
+
+  const email = typeof emailRaw === "string" ? emailRaw.trim().toLowerCase() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError("Enter a valid email address", 400);
+
+  const matches = await repo.findUsersByEmail(email);
+  if (matches.length === 0) {
+    throw new AppError("No NyayMitra account uses that email. Ask the advocate to register first, then link it.", 404);
+  }
+  if (matches.length > 1) throw new AppError("More than one account uses that email — resolve the duplicate first.", 409);
+
+  const user = matches[0];
+  const taken = await repo.findAdvocateByUserId(user.id);
+  if (taken && taken.id !== advocateId) {
+    throw new AppError(`That account is already linked to "${taken.displayName}"`, 409);
+  }
+
+  await repo.setAccount(advocateId, user.id);
+  return adminShape(await getOrThrow(advocateId));
+};
+
+export const unlinkAccount = async (advocateId: number) => {
+  await getOrThrow(advocateId);
+  await repo.setAccount(advocateId, null);
+  return adminShape(await getOrThrow(advocateId));
 };

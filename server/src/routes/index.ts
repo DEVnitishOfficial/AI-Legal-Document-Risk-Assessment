@@ -10,6 +10,7 @@ import authRoutes from "../modules/auth/auth.routes";
 import otpRoutes from "../modules/otp/otp.routes";
 import { advocateRoutes, adminAdvocateRoutes } from "../modules/advocate/advocate.routes";
 import consultationRoutes from "../modules/consultation/consultation.routes";
+import { humanRoutes, deskRoutes } from "../modules/human/human.routes";
 
 
 const router = Router();
@@ -31,5 +32,7 @@ router.use("/auth/otp", otpRoutes)
 router.use("/advocates", advocateRoutes)
 router.use("/admin/advocates", adminAdvocateRoutes)
 router.use("/consultations", consultationRoutes)
+router.use("/human-consultations", humanRoutes)
+router.use("/advocate-desk", deskRoutes)
 
 export default router;
