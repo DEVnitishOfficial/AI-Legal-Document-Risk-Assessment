@@ -1,6 +1,6 @@
 import { useState } from "react";
-import toast from "react-hot-toast";
 import { CheckCircle2, Circle, Trash2, Plus } from "lucide-react";
+import FormError from "../../components/ui/FormError";
 import {
   advocateAdminApi,
   apiErrorMessage,
@@ -22,14 +22,16 @@ export default function CredentialsEditor({ advocate, onChange }: Props) {
   const types = isAi ? AI_CREDENTIAL_TYPES : HUMAN_CREDENTIAL_TYPES;
   const [draft, setDraft] = useState({ ...EMPTY, type: types[0] });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const run = async (fn: () => Promise<any>, failure: string) => {
     setBusy(true);
+    setError(null);
     try {
       onChange(await fn());
       return true;
     } catch (err) {
-      toast.error(apiErrorMessage(err, failure));
+      setError(apiErrorMessage(err, failure));
       return false;
     } finally {
       setBusy(false);
@@ -47,7 +49,7 @@ export default function CredentialsEditor({ advocate, onChange }: Props) {
           identifier: draft.identifier,
           year: draft.year === "" ? null : Number(draft.year),
         }),
-      "Couldn't add credential"
+      "We couldn't add this credential. Please try again."
     );
     if (ok) setDraft({ ...EMPTY, type: draft.type });
   };
@@ -103,6 +105,8 @@ export default function CredentialsEditor({ advocate, onChange }: Props) {
           ))}
         </ul>
       )}
+
+      <FormError message={error} className="mb-4" />
 
       <form onSubmit={add} className="grid sm:grid-cols-6 gap-3 items-end">
         <div className="sm:col-span-2">

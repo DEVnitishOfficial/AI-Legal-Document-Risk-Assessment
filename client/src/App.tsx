@@ -15,9 +15,14 @@ import ConnectAdvocatePage from './pages/ConnectAdvocatePage'
 import JoinConsultationPage from './pages/JoinConsultationPage'
 import ConsultationRoomPage from './pages/ConsultationRoomPage'
 import ConsultationHistoryPage from './pages/ConsultationHistoryPage'
+import HumanConsultationPage from './pages/HumanConsultationPage'
+import AdvocateDeskPage from './pages/AdvocateDeskPage'
+import AdvocateSessionPage from './pages/AdvocateSessionPage'
+import AdvocateRoute from './routes/AdvocateRoute'
 import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { fetchCurrentUser } from './features/auth/authSlice'
+import { fetchCurrentUser, sessionExpired } from './features/auth/authSlice'
+import { SESSION_EXPIRED_EVENT } from './services/apiError'
 import { useTheme } from './app/ThemeProvider'
 
 function App () {
@@ -31,6 +36,13 @@ function App () {
       dispatch(fetchCurrentUser())
     }
   }, [])
+
+  // The API client fires this when the server stops accepting the saved token.
+  useEffect(() => {
+    const onExpired = () => dispatch(sessionExpired())
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired)
+  }, [dispatch])
 
   return (
     <BrowserRouter>
@@ -93,6 +105,34 @@ function App () {
           element={
             <ProtectedRoute>
               <ConsultationRoomPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/connect-advocate/human/:id'
+          element={
+            <ProtectedRoute>
+              <HumanConsultationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/advocate'
+          element={
+            <ProtectedRoute>
+              <AdvocateRoute>
+                <AdvocateDeskPage />
+              </AdvocateRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/advocate/session/:id'
+          element={
+            <ProtectedRoute>
+              <AdvocateRoute>
+                <AdvocateSessionPage />
+              </AdvocateRoute>
             </ProtectedRoute>
           }
         />

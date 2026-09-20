@@ -8,6 +8,7 @@ import {
   Landmark,
   ShieldCheck,
   Headset,
+  Briefcase,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../features/auth/authSlice";
@@ -15,12 +16,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import ThemeToggle from "../ThemeToggle";
+import { useAdvocateAccount } from "../../features/human/useAdvocateAccount";
 
 export default function Sidebar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: any) => state.auth.user);
+  const { advocate } = useAdvocateAccount();
 
   const [isOpen, setIsOpen] = useState(() => {
     return localStorage.getItem("sidebarOpen") === "true";
@@ -55,6 +58,8 @@ export default function Sidebar() {
     { label: "Documents", icon: <FileText size={17} />, path: "/documents" },
     { label: "Legal Assistant", icon: <Scale size={17} />, path: "/legal-assistant" },
     { label: "Connect Advocate", icon: <Headset size={17} />, path: "/connect-advocate" },
+    // Shown only to accounts linked to a human advocate profile; the server checks this on every desk call.
+    ...(advocate ? [{ label: "Advocate Desk", icon: <Briefcase size={17} />, path: "/advocate" }] : []),
     // Shown only to admins; the server re-checks the role on every admin call.
     ...(user?.role === "ADMIN"
       ? [{ label: "Admin", icon: <ShieldCheck size={17} />, path: "/admin/advocates" }]

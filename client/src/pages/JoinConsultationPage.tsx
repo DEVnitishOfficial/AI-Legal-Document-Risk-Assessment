@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import PageShell from "../features/consultation/PageShell";
+import { humanApi } from "../features/human/humanApi";
 import LobbyPanel from "../features/consultation/LobbyPanel";
 import {
   apiErrorMessage,
@@ -24,7 +25,7 @@ export default function JoinConsultationPage() {
   useEffect(() => {
     Promise.all([consultationApi.advocates(), consultationApi.options()])
       .then(([advocates, opts]) => {
-        const found = advocates.find((a) => a.slug === slug && a.kind === "AI");
+        const found = advocates.find((a) => a.slug === slug);
         if (!found) setLoadError("That advocate isn't available.");
         setAdvocate(found ?? null);
         setOptions(opts);
@@ -32,14 +33,20 @@ export default function JoinConsultationPage() {
       .catch((err) => setLoadError(apiErrorMessage(err, "Could not load the consultation options.")));
   }, [slug]);
 
-  const join = async ({ state, language }: { state: string; language: string }) => {
+  const join = async ({ state, language, camera, subject }: { state: string; language: string; camera: boolean; subject: string }) => {
     if (!advocate) return;
     setJoining(true);
     setJoinError(null);
     try {
+      // A real advocate has to accept first, so it goes to the waiting page, not straight into a call.
+      if (advocate.kind === "HUMAN") {
+        const request = await humanApi.request({ advocateId: advocate.id, state, language, subject, consent: true });
+        navigate(`/connect-advocate/human/${request.id}`, { state: { camera } });
+        return;
+      }
       const c = await consultationApi.create({ advocateId: advocate.id, state, language, consent: true });
       // The room starts the call itself; the flag lets it do so without a second click.
-      navigate(`/connect-advocate/session/${c.id}`, { state: { autostart: true } });
+      navigate(`/connect-advocate/session/${c.id}`, { state: { autostart: true, camera } });
     } catch (err) {
       setJoinError(apiErrorMessage(err, "Could not start the consultation."));
       setJoining(false);
@@ -76,7 +83,21 @@ export default function JoinConsultationPage() {
               </span>
               <h1 className="font-display text-2xl font-medium mt-1">Before you speak with {advocate.displayName}</h1>
             </div>
-            <LobbyPanel advocate={advocate} options={options} busy={joining} error={joinError} onJoin={join} />
+            {advocate.kind === "HUMAN" && advocate.availability !== "AVAILABLE" ? (
+              <p role="status" className="max-w-2xl rounded-xl border border-cream-200 dark:border-white/10 bg-white dark:bg-navy-900 p-5 text-sm leading-relaxed">
+                {advocate.displayName} is {advocate.availability === "BUSY" ? "in another consultation" : "offline"} right now, so a request
+                can't be sent. Please try again later, or choose another advocate.
+              </p>
+            ) : (
+              <LobbyPanel
+                advocate={advocate}
+                options={options}
+                busy={joining}
+                error={joinError}
+                onJoin={join}
+                mode={advocate.kind === "HUMAN" ? "human" : "ai"}
+              />
+            )}
           </>
         )}
       </div>
