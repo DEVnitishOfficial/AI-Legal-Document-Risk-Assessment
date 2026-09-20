@@ -9,13 +9,13 @@ export const registerUser = async (data: any) => {
   const existing = await userRepo.findUserByEmail(data.email);
 
   if (existing) {
-    throw new AppError("User already exists", 400);
+    throw new AppError("An account with this email already exists. Please sign in instead.", 409);
   }
 
   if (data.phone) {
     const existingPhone = await userRepo.findUserByPhone(data.phone);
     if (existingPhone) {
-      throw new AppError("Phone number already registered", 400);
+      throw new AppError("An account with this mobile number already exists. Please sign in instead.", 409);
     }
   }
 
@@ -37,13 +37,13 @@ export const loginUser = async (email: string, password: string) => {
   const user = await userRepo.findUserByEmail(email);
 
   if (!user) {
-    throw new AppError("User not registered, please register first", 404);
+    throw new AppError("We couldn't find an account with this email. Please create an account first.", 404);
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
 
   if (!isMatch) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("That password doesn't match this account. Please try again.", 401);
   }
 
   const token = generateToken({ id: user.id, email: user.email });
