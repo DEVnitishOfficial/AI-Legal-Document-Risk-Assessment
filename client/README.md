@@ -690,3 +690,133 @@ The client for the live voice consultation (server: Phases 18–21). A new **Con
 **Known limits:** an advocate who takes longer than a few seconds to answer shows "Listening" with no spinner; the speaking rings use audio loudness, not the model's own events; refreshing the page during a call drops the call (it is closed by the server within moments and the summary is still produced).
 
 ---
+
+# 🎥 Connect Advocate — Phase 4: A Video-Call Room and an Optional Camera (Phase 17)
+
+---
+
+## 📌 Overview
+
+The call used to be two dark tiles. It is now laid out like a real video call, and the user can optionally turn on their camera. An animated illustrated face for the advocate was tried and **removed** — it read as a cartoon, not the realistic humanoid that was wanted (see the note at the end).
+
+---
+
+## 🔑 What was built
+
+* **Video-call room** (`CallRoom.tsx`): the advocate is centred on a dark stage as a gold-ringed robot icon (`AdvocateOrb.tsx`) whose rings and glow swell with the advocate's **real voice level**, with three bouncing dots while it is thinking. Top-left: the Live pill and a name tag (**"NyayMitra AI Advocate" + an AI chip** + *Listening / Speaking / Thinking… / Checking the law…*); top-right: the countdown; your picture-in-picture in the corner; **live captions** taken from the call's event stream (last two lines, so they never cover the stage); a floating control bar — mic, camera, captions, transcript panel, end call. The transcript / sources side panel can be hidden for a bigger stage. A slim notice keeps "AI, not a human lawyer / call 112" on screen.
+* **Camera, optional and private** (`useLocalCamera.ts`, `SelfView.tsx`): check-in has a prominent "Would you like to turn on your camera?" card with a live preview. Nothing opens until the user chooses; a refusal or missing camera just shows a friendly note and they carry on; the choice carries into the call and can be toggled there. The video is **self-view only — never added to the call**, because the advocate is an AI that doesn't use video (the screen says so). The camera is released the instant the call ends.
+* **Talks like a person** — server side, see Phase 22 (warmer `marin` voice, greets by first name, empathy, natural acknowledgements).
+
+---
+
+## ✅ Result (Playwright in real Chromium, fake camera, synthetic spoken caller; 24 checks)
+
+The camera step explains itself and opens nothing until chosen; the lobby preview plays; the camera chosen at check-in comes on as a self-view and toggles off and on; the rings pulse with the advocate's real voice; live captions appear; the status shows Speaking / Listening and a Thinking / Checking-the-law state before the answer; the answer still carries a verified provision chip; mute, captions and the panel toggle work; no horizontal scroll at 390 px; **after the call no camera or microphone track is left running**; a refused camera shows a friendly note and Join still works; no console errors. Desktop and mobile were reviewed as screenshots (two layout bugs found and fixed that way: the self-view landing on top of the name tag, and captions covering the stage on phones).
+
+**About a realistic face:** a hand-drawn SVG portrait (blinking, voice-driven mouth, thinking expression) was built and tested, then removed because it looked like a cartoon. A photo-real talking humanoid cannot be drawn in code; it needs a streaming-avatar service (e.g. HeyGen, D-ID, Tavus, Simli) with its own account and API key, or a licensed 3D character. If one is chosen, only `AdvocateOrb` would be replaced — the room, camera, captions and controls stay.
+
+---
+
+# 🗂️ Connect Advocate — Phase 5: A Compact Advocate Card (Phase 18)
+
+---
+
+## 📌 Overview
+
+The AI advocate's card had grown to ~1000 px tall (bio, languages, coverage, practice areas, ten knowledge sources, disclaimer all at once). It is now a small card, and the human-advocates placeholder sits beside it in the same row.
+
+---
+
+## 🔑 What changed
+
+* **`AdvocateCard`** shows only the essentials: the "AI advocate" label, photo/icon, name, the **AI** badge, the headline and a permanent one-liner *"An AI — not a human lawyer."* Everything else is behind **pills** — *About*, *Languages & coverage*, *What it's grounded in*, *Good to know* (humans get *Credentials* instead of the last two) — and opens **only when clicked, one section at a time**; clicking the open pill collapses it. Nothing is open by default. Pills are real buttons (`aria-expanded`, `aria-controls`), the "grounded in" list scrolls if long, and "Good to know" states the limits plainly: it cannot appear in court, and only central law is loaded (no state rules or judgments).
+* **One row of equal cards** (`ConnectAdvocatePage`): the AI card and the new `HumanAdvocatesSoonCard` ("Speak to a real lawyer · Coming soon" with a disabled button) share a two-column grid that stacks on phones; the two separate section headings became small labels inside each card. When human advocates exist they appear in the same grid through the same card. Cards align to the top, so opening a section in one does not stretch the other.
+
+---
+
+## ✅ Result (Playwright, 17 checks)
+
+Both cards share a top edge and width (438 px each); the AI card is 291 px tall collapsed; nothing is expanded by default; each pill shows only its own section and replaces the previous one; "grounded in" lists all 10 loaded Acts; clicking the open pill collapses it; the Coming-soon card stays ~195 px while the AI card expands; Start consultation still goes to check-in; no console errors; no horizontal scroll at 390 px, with or without a section open. Light and dark screenshots reviewed.
+
+---
+
+# ❎ Admin — A Close Button and Auto-Close on Save (Phase 19)
+
+---
+
+## 🔑 What changed
+
+* The advocate editor (`/admin/advocates`) now has a **close (X) button at the top right**, level with the advocate's name, on both the edit panel and the "New advocate" form. Closing returns to the empty "Select an advocate" state; the list stays as it is. Unsaved edits in the panel are discarded.
+* **Saving closes the editor automatically** — the profile form's *Save changes* and the AI advocate's *Save AI configuration* (`onSubmitted` callbacks, called only after the server accepts the save). A failed save (e.g. trying to publish an unverified advocate) keeps the editor open so nothing typed is lost.
+* Deliberately **not** auto-closed: creating a new advocate (it still needs credentials before it can be verified), photo upload/removal, and adding, verifying or removing credentials — those are steps within one editing session.
+
+## ✅ Result (Playwright, 17 checks, throwaway advocates only)
+
+X present, top-right and level with the title; X closes; Save changes closes and the change is stored; a failed save stays open; photo upload and adding a credential stay open; the new-advocate form has an X and *Create* keeps it open; saving the AI configuration closes; no console errors; no horizontal scroll at 390 px. The real advocates and the real AI configuration were verified untouched afterwards.
+
+---
+
+# 🧑‍⚖️ Connect Advocate — Phase 6: Live Calls With Real Advocates (Phase 20)
+
+---
+
+## 📌 Overview
+
+The client side of calling a real advocate (server: Phase 23). An advocate signs in, opens their **Advocate Desk** and switches **Available now** on; a client requests a consultation from the advocate's card; the advocate accepts; and the two connect in a private video call, browser to browser, that nobody records.
+
+---
+
+## 🔑 What was built
+
+* **Client journey.** On the choose page a human advocate's card shows **Available now / In a consultation / Offline** (refreshed every 8 s) and a *Request consultation* button only when they can be reached. The check-in form (`LobbyPanel`, `mode="human"`) adds *what would you like to talk about?* (10+ characters), the state/language, the optional camera preview and a notice written for a real person (what the advocate sees; not recorded; the advocate's own guidance). Submitting creates the request and opens `/connect-advocate/human/:id` (`HumanConsultationPage`), which follows the request live and shows: **waiting** (with the time left and *Cancel request*) → **the call** → **finished** (duration, the notes the advocate chose to share, delete), or a clear message if the advocate declined (with their reason), didn't answer in time, or the request was cancelled. Refreshing mid-call offers *Join the call* to rejoin.
+* **The call** (`useWebRtcCall.ts`, `HumanCallRoom.tsx`). The other person's video fills the stage — with their photo or initial and the sound still playing while their camera is off — and yours sits in the corner. Mic, camera (each side announces it, so the switch is instant) and *End call*; a countdown from the **server's** clock; a notice that the call isn't recorded; "Tap to hear" if the browser blocks autoplay; friendly errors for a blocked microphone/camera or a failed connection. The advocate always makes the WebRTC offer; if either side refreshes or drops, the other waits and the call renegotiates when they return.
+* **The Advocate Desk** (`/advocate`, sidebar item shown only to accounts linked to an advocate profile). An **Available now** switch (with the reason if the profile isn't published/verified), a live connection indicator, **requests waiting** with the client's first name + initial, state, language, message, a countdown and *Accept / Decline (optional reason)*, **in progress** calls with *Join / Rejoin*, and **past consultations**. New requests play a chime, flash the tab title and (if allowed) raise a desktop notification.
+* **Advocate session** (`/advocate/session/:id`). The call with the client's details and a **notes panel** beside it — private notes, and notes for the client (shown to them only after the call). Notes autosave; the panel saves only the field that changed, follows the server when a field has no unsaved edits, and saves anything pending as it closes.
+* **Admin.** A *Advocate login* section in the human advocate editor links or unlinks the advocate's account by email.
+* History lists human consultations with their outcome and links them to the right page; AI-only pages redirect human ones (and vice-versa).
+
+---
+
+## ✅ Result (Playwright — two separate real browsers, fake camera and microphone; 43 checks)
+
+Admin links the advocate's account in the UI; the advocate sees an Advocate Desk (a normal user doesn't, and `/advocate` bounces them); the desk starts **offline**; the client sees **Offline** and a disabled button, then **Available now** once the advocate switches on; the request form needs a subject and consent; the request reaches the desk within seconds with *Rohan V.* and never the client's email; **cancel** withdraws it; **decline** tells the client at once with the reason; **accept** opens the session and **both sides go Live**; each receives the other's **video and audio**; a server-clock countdown on both; the client turning their camera off shows the placeholder to the advocate, and back on restores video; mute; notes autosave; **a refresh mid-call** offers rejoin and the call **reconnects on both sides**; the advocate ends the call and both land on the finished page; the client sees the **shared** notes and never the private ones; the advocate still has both; histories list the outcomes; going offline shows **Offline** to clients; no horizontal scroll at 390 px; no console errors on either side. The real advocates were verified untouched afterwards.
+
+**A bug this testing found (and fixed):** when a call ended, the advocate's notes panel remounted showing the notes as they were *before* the call — empty boxes — and the next edit would have overwritten the saved text. The panel now follows the server, sends only what changed, and saves on close.
+
+**Known limits:** a TURN relay must be configured for reliability on strict networks; advocates must keep the desk tab open (no email/SMS alerts yet); no payments or booked slots yet; a refreshed tab has to press *Join the call* (browsers require a gesture to restart media).
+
+---
+
+---
+
+# 💬 Plain-Language Errors Across the Platform (Phase 21)
+
+---
+
+## 📌 Overview
+
+Failures used to reach people as developer text — signing in with an email that was never registered showed **"Request failed with status code 404"**, an offline upload said only "Upload failed", and a failed document list said **"No documents yet"**. Every screen now tells the person what actually went wrong and what to do, in the place they are looking.
+
+---
+
+## 🔑 What changed
+
+* **One helper for every error** (`services/apiError.ts`). `apiErrorMessage(err, fallback)` turns any failure into a sentence: the server's own message for 4xx answers; *"We can't reach NyayMitra… check your internet connection"* when there is no answer (offline, server down, timeout); *"Something went wrong on our side"* for a server crash (never "Internal Server Error"); *"Your session has expired. Please sign in again."* when a saved login stops working. `failedResponseError` does the same for the streaming chat, which uses `fetch` rather than axios. The old per-screen `err?.response?.data?.message || "Failed"` pattern is gone.
+* **Sign-in** (`Login.tsx`, `AuthNotice.tsx`, `AuthField.tsx`). The message shows inline above the form and scrolls into view (so it is seen on a phone). An unregistered email says so and offers **Create an account** (which opens Register with the email already filled in); a wrong password outlines the password field; typing in the highlighted field clears the message; empty or malformed input is caught before any request. Failed Google sign-in returns to this page with an explanation instead of a page of raw JSON.
+* **Register** (`Register.tsx`). Each problem names the field (outlined) — passwords that differ, a short password, an unticked agreement. An email or mobile number that already has an account says so and offers **Sign in instead**.
+* **Expired sessions** (`services/api.ts`, `authSlice.ts`, `ProtectedRoute.tsx`, `App.tsx`). When the server stops accepting the saved token, it is cleared once and the person lands on sign-in with *"Your session has expired"* (previously every screen failed separately and the dashboard stayed open).
+* **Errors in place, not in toasts** (`components/ui/FormError.tsx`). Anything a person submits now shows its failure beside the button that caused it: document upload, the chat's *Attach a document* window, rename and delete dialogs (the dialog stays open and says why), and the admin editors (advocate save, photo, AI configuration, credentials, account link). Toasts remain for quick confirmations and background actions (favorite, copy, load).
+* **No more silent failures.** The documents list shows the reason with **Try again** instead of claiming "No documents yet"; the Advocate Desk shows a warning if its refresh fails (an advocate could otherwise miss a request without knowing) instead of "Loading…" forever.
+* Small wording fixes: the blocked-microphone message says how to unblock it.
+
+---
+
+## ✅ Result (Playwright, 31 checks, real browser against the real server code)
+
+The screenshot case (unregistered email → plain message, email outlined, "Create an account" carries the email to Register); wrong password; empty/malformed input sends no request; server unreachable and server crash (simulated); register mismatch and already-registered (real 409); failed Google sign-in; a stale token sends the person to sign-in with the explanation and clears it; upload with no file and while offline show inside the panel and not as a toast; a failed document load says so and *Try again* recovers. Checked in light and dark at phone width.
+
+**A slip worth recording:** a bulk find-and-replace script I used to migrate the old error pattern corrupted seven files (it inserted text between every character). The type-check would not have caught it, but a diff review did; the files were restored from git and re-edited one at a time.
+
+**Known limits:** the streaming chat still reports a failed answer as a toast (it is a background stream, not a form); the unused `pages/DocumentList.tsx` still has an old type error.
+
+---
