@@ -1,58 +1,87 @@
 import { useState } from "react";
 import { registerUser } from "../features/auth/authSlice";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AuthShell from "../features/auth/AuthShell";
 import CaseFileCard from "../features/auth/CaseFileCard";
 import AuthField from "../features/auth/AuthField";
+import AuthNotice, { type AuthNoticeData } from "../features/auth/AuthNotice";
 import { API_BASE_URL } from "../services/api";
+import type { ApiFailure } from "../services/apiError";
+
+type Field = "name" | "email" | "phone" | "password" | "confirmPassword" | "agreed";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Register() {
     const navigate = useNavigate();
     const dispatch = useDispatch<any>();
+    const location = useLocation();
 
-    const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
+    // Arriving from the sign-in page's "Create an account" keeps the email they already typed.
+    const [form, setForm] = useState({
+        name: "",
+        email: (location.state as { email?: string } | null)?.email ?? "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+    });
     const [agreed, setAgreed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<AuthNoticeData | null>(null);
+    const [badField, setBadField] = useState<Field | null>(null);
+
+    const showError = (message: string, field: Field | null = null) => {
+        setNotice({ kind: "error", message });
+        setBadField(field);
+    };
+    // Editing the field a message was about clears that message.
+    const edited = (field: Field) => {
+        if (badField === field) {
+            setNotice(null);
+            setBadField(null);
+        }
+    };
 
     const handleRegister = async () => {
-        if (!form.name || !form.email || !form.password || !form.confirmPassword) {
-            setError("Please fill in all required fields.");
-            return;
-        }
-        if (form.password !== form.confirmPassword) {
-            setError("Passwords don't match.");
-            return;
-        }
-        if (form.password.length < 8) {
-            setError("Password must be at least 8 characters.");
-            return;
-        }
-        if (!agreed) {
-            setError("Please agree to the Terms and Privacy Policy to continue.");
-            return;
-        }
+        if (!form.name.trim()) return showError("Please enter your full name.", "name");
+        if (!form.email.trim()) return showError("Please enter your email address.", "email");
+        if (!EMAIL_PATTERN.test(form.email.trim())) return showError("That doesn't look like a valid email address. Please check it and try again.", "email");
+        if (!form.password) return showError("Please choose a password.", "password");
+        if (form.password.length < 8) return showError("Your password needs at least 8 characters.", "password");
+        if (form.password !== form.confirmPassword) return showError("The two passwords don't match. Please type them again.", "confirmPassword");
+        if (!agreed) return showError("Please tick the box to agree to the Terms and Privacy Policy.", "agreed");
 
         try {
             setIsLoading(true);
-            setError(null);
+            setNotice(null);
+            setBadField(null);
 
             await dispatch(
                 registerUser({
-                    name: form.name,
-                    email: form.email,
-                    phone: form.phone || undefined,
+                    name: form.name.trim(),
+                    email: form.email.trim(),
+                    phone: form.phone.trim() || undefined,
                     password: form.password,
                 })
             ).unwrap();
 
             toast.success("Account created — please sign in.");
             navigate("/login");
-        } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || "Registration failed. Please try again.");
+        } catch (err) {
+            const { message, status } = err as ApiFailure;
+            if (status === 409) {
+                // Email or mobile number already has an account: signing in is the way forward.
+                setNotice({
+                    kind: "error",
+                    message,
+                    action: { label: "Sign in instead", onClick: () => navigate("/login") },
+                });
+                setBadField(/phone|mobile/i.test(message) ? "phone" : "email");
+            } else {
+                showError(message);
+            }
             setIsLoading(false);
         }
     };
@@ -74,69 +103,85 @@ export default function Register() {
                     Set up your workspace to start analyzing documents.
                 </p>
 
-                <AnimatePresence>
-                    {error && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-red-700 bg-red-50 border border-red-200 dark:text-red-400 dark:bg-red-950/50 dark:border-red-800/50 p-3 rounded-lg mb-4 overflow-hidden"
-                        >
-                            {error}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <AuthNotice notice={notice} />
 
                 <AuthField
                     label="Full name"
                     value={form.name}
                     disabled={isLoading}
+                    invalid={badField === "name"}
                     placeholder="As per your ID"
                     autoComplete="name"
-                    onChange={(v) => setForm({ ...form, name: v })}
+                    onChange={(v) => {
+                        setForm({ ...form, name: v });
+                        edited("name");
+                    }}
                 />
                 <AuthField
                     label="Email address"
                     type="email"
                     value={form.email}
                     disabled={isLoading}
+                    invalid={badField === "email"}
                     placeholder="you@example.com"
                     autoComplete="email"
-                    onChange={(v) => setForm({ ...form, email: v })}
+                    onChange={(v) => {
+                        setForm({ ...form, email: v });
+                        edited("email");
+                    }}
                 />
                 <AuthField
                     label="Mobile number"
                     type="tel"
                     value={form.phone}
                     disabled={isLoading}
+                    invalid={badField === "phone"}
                     placeholder="+91 98765 43210"
                     autoComplete="tel"
-                    onChange={(v) => setForm({ ...form, phone: v })}
+                    onChange={(v) => {
+                        setForm({ ...form, phone: v });
+                        edited("phone");
+                    }}
                 />
                 <AuthField
                     label="Password"
                     isPassword
                     value={form.password}
                     disabled={isLoading}
+                    invalid={badField === "password"}
                     placeholder="At least 8 characters"
                     autoComplete="new-password"
-                    onChange={(v) => setForm({ ...form, password: v })}
+                    onChange={(v) => {
+                        setForm({ ...form, password: v });
+                        edited("password");
+                    }}
                 />
                 <AuthField
                     label="Confirm password"
                     isPassword
                     value={form.confirmPassword}
                     disabled={isLoading}
+                    invalid={badField === "confirmPassword"}
                     placeholder="Re-enter password"
                     autoComplete="new-password"
-                    onChange={(v) => setForm({ ...form, confirmPassword: v })}
+                    onChange={(v) => {
+                        setForm({ ...form, confirmPassword: v });
+                        edited("confirmPassword");
+                    }}
                 />
 
-                <label className="flex items-start gap-2.5 mb-6 text-sm text-gray-600 dark:text-cream-100/60 cursor-pointer select-none">
+                <label
+                    className={`flex items-start gap-2.5 mb-6 text-sm cursor-pointer select-none ${
+                        badField === "agreed" ? "text-red-700 dark:text-red-400" : "text-gray-600 dark:text-cream-100/60"
+                    }`}
+                >
                     <input
                         type="checkbox"
                         checked={agreed}
-                        onChange={(e) => setAgreed(e.target.checked)}
+                        onChange={(e) => {
+                            setAgreed(e.target.checked);
+                            edited("agreed");
+                        }}
                         className="accent-gold-600 mt-0.5 shrink-0"
                     />
                     <span>

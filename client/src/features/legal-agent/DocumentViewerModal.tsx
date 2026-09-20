@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../../services/api";
+import { apiErrorMessage } from "../../services/apiError";
 import type { AttachedDocument } from "./types";
 
 interface DocumentViewerModalProps {
@@ -39,7 +40,7 @@ export default function DocumentViewerModal({ documentId, onClose }: DocumentVie
                     setTextContent(content || "");
                 }
             } catch (err: any) {
-                toast.error(err?.response?.data?.message || "Failed to load document");
+                toast.error(apiErrorMessage(err, "We couldn't open this document. Please try again."));
                 onClose();
             } finally {
                 setLoading(false);

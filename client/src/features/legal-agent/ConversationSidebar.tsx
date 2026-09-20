@@ -3,6 +3,7 @@ import { Plus, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import RenameDialog from "../../components/ui/RenameDialog";
+import { apiErrorMessage } from "../../services/apiError";
 import type { Conversation } from "./types";
 
 interface ConversationSidebarProps {
@@ -31,6 +32,7 @@ export default function ConversationSidebar({
     const [renaming, setRenaming] = useState<Conversation | null>(null);
     const [deleting, setDeleting] = useState<Conversation | null>(null);
     const [deleteBusy, setDeleteBusy] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const saveRename = async (title: string) => {
         if (!renaming) return;
@@ -38,21 +40,21 @@ export default function ConversationSidebar({
             await onRename(renaming.id, title);
             toast.success("Chat renamed");
             setRenaming(null);
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Couldn't rename chat");
-            throw err; // keeps the dialog open
+        } catch (err) {
+            throw err; // keeps the dialog open, which shows the reason itself
         }
     };
 
     const confirmDelete = async () => {
         if (!deleting) return;
         setDeleteBusy(true);
+        setDeleteError(null);
         try {
             await onDelete(deleting.id);
             toast.success("Chat deleted");
             setDeleting(null);
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Couldn't delete chat");
+        } catch (err) {
+            setDeleteError(apiErrorMessage(err, "We couldn't delete this chat. Please try again."));
         } finally {
             setDeleteBusy(false);
         }
@@ -104,7 +106,10 @@ export default function ConversationSidebar({
                                         <Pencil size={13} />
                                     </button>
                                     <button
-                                        onClick={() => setDeleting(c)}
+                                        onClick={() => {
+                                            setDeleteError(null);
+                                            setDeleting(c);
+                                        }}
                                         title="Delete chat"
                                         aria-label={`Delete chat: ${c.title || "New conversation"}`}
                                         className={`${ACTION_BTN} hover:!text-risk-high-fg dark:hover:!text-risk-high-fg-dark`}
@@ -131,6 +136,7 @@ export default function ConversationSidebar({
                 <ConfirmDialog
                     danger
                     busy={deleteBusy}
+                    error={deleteError}
                     title="Delete this chat?"
                     message={`“${deleting.title || "New conversation"}” and all of its messages will be permanently deleted. This can't be undone.`}
                     confirmLabel="Delete chat"

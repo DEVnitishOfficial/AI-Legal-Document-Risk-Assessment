@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Paperclip, Mic, Square, Languages, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../../services/api";
+import { apiErrorMessage } from "../../services/apiError";
 import { getSpeechRecognitionCtor, isSpeechRecognitionSupported } from "./speechRecognition";
 import type { ChatLanguage } from "./types";
 
@@ -98,7 +99,9 @@ export default function ChatInput({
         recognition.onerror = (event: any) => {
             if (event.error === "not-allowed" || event.error === "service-not-allowed") {
                 toast.error(
-                    language === "hi" ? "माइक्रोफ़ोन तक पहुंच नहीं मिली" : "Microphone access denied"
+                    language === "hi"
+                        ? "माइक्रोफ़ोन तक पहुंच नहीं मिली"
+                        : "Microphone access is blocked. Allow it from the lock icon in your browser's address bar to use voice input."
                 );
                 stopRecording();
             }
@@ -143,7 +146,7 @@ export default function ChatInput({
                 const transcript = await transcribeFallback(blob, language);
                 setValue((baseTextRef.current + transcript).trim());
             } catch (err: any) {
-                toast.error(err?.response?.data?.message || "Could not transcribe audio");
+                toast.error(apiErrorMessage(err, "We couldn't turn your recording into text. Please try again."));
             } finally {
                 setIsTranscribing(false);
             }
@@ -174,7 +177,7 @@ export default function ChatInput({
             toast.error(
                 language === "hi"
                     ? "माइक्रोफ़ोन तक पहुंच नहीं मिली"
-                    : "Couldn't access your microphone — check browser permissions"
+                    : "We couldn't access your microphone. Please allow microphone access in your browser and try again."
             );
         }
     };

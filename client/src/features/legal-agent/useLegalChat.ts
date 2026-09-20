@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import API, { API_BASE_URL } from "../../services/api";
 import toast from "react-hot-toast";
+import { apiErrorMessage, failedResponseError } from "../../services/apiError";
 import { readSseEvents } from "./sse";
 import type { AttachedDocument, ChatLanguage, Conversation, Message } from "./types";
 
@@ -29,7 +30,7 @@ export function useLegalChat() {
             const res = await API.get("/legal-agent/conversations");
             setConversations(res.data.data.conversations);
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Failed to load conversations");
+            toast.error(apiErrorMessage(err, "We couldn't load your chats. Please refresh the page."));
         } finally {
             setLoadingConversations(false);
             setConversationsLoaded(true);
@@ -50,7 +51,7 @@ export function useLegalChat() {
             setAttachedDocuments((conversation.documents || []).map((d) => d.document));
             setLanguageState(conversation.language);
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Failed to load conversation");
+            toast.error(apiErrorMessage(err, "We couldn't open this chat. Please try again."));
             // Don't stay "in" a conversation that couldn't be opened — a later
             // message would be sent to it and fail the same way.
             setActiveId((current) => (current === id ? null : current));
@@ -69,7 +70,7 @@ export function useLegalChat() {
             setAttachedDocuments([]);
             return conversation.id;
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Failed to start a new conversation");
+            toast.error(apiErrorMessage(err, "We couldn't start a new chat. Please try again."));
             return null;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,10 +131,7 @@ export function useLegalChat() {
                     body: JSON.stringify({ content: trimmed }),
                 });
 
-                if (!res.ok) {
-                    const body = await res.json().catch(() => null);
-                    throw new Error(body?.message || `Request failed (${res.status})`);
-                }
+                if (!res.ok) throw await failedResponseError(res);
 
                 for await (const event of readSseEvents(res)) {
                     if (event.type === "user_message") {
@@ -167,11 +165,11 @@ export function useLegalChat() {
                         setStreamingMessageId(null);
                         bumpConversation();
                     } else if (event.type === "error") {
-                        toast.error(event.message || "Something went wrong generating a response");
+                        toast.error(event.message || "The assistant couldn't finish that answer. Please send your message again.");
                     }
                 }
             } catch (err: any) {
-                toast.error(err?.message || "Failed to send message");
+                toast.error(apiErrorMessage(err, "Your message couldn't be sent. Please try again."));
                 setMessages((prev) => prev.filter((m) => m.id !== optimisticId && m.id !== streamingId));
                 setStreamingMessageId(null);
             } finally {
@@ -192,7 +190,7 @@ export function useLegalChat() {
                     prev.map((c) => (c.id === activeId ? { ...c, language: lang } : c))
                 );
             } catch (err: any) {
-                toast.error(err?.response?.data?.message || "Failed to switch language");
+                toast.error(apiErrorMessage(err, "We couldn't switch the language. Please try again."));
             }
         },
         [activeId]
@@ -233,7 +231,7 @@ export function useLegalChat() {
                 setAttachedDocuments((prev) => [...prev, res.data.data.link.document]);
                 toast.success("Document attached to this conversation");
             } catch (err: any) {
-                toast.error(err?.response?.data?.message || "Failed to attach document");
+                toast.error(apiErrorMessage(err, "We couldn't attach that document. Please try again."));
             }
         },
         [ensureConversation]

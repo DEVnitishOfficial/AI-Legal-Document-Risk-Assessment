@@ -13,9 +13,15 @@ export default function OAuthSuccess() {
 
     if (token) {
       localStorage.setItem("token", token);
-      dispatch(fetchCurrentUser()).finally(() => navigate("/dashboard"));
+      dispatch(fetchCurrentUser())
+        .unwrap()
+        .then(() => navigate("/dashboard"))
+        .catch(() => {
+          localStorage.removeItem("token");
+          navigate("/login?error=google", { replace: true });
+        });
     } else {
-      navigate("/login");
+      navigate("/login?error=google", { replace: true });
     }
   }, []);
 

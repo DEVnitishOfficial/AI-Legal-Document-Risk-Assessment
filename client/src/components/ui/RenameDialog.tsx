@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import FormError from "./FormError";
+import { apiErrorMessage } from "../../services/apiError";
 
 interface RenameDialogProps {
   title: string;
   label: string;
   initialValue: string;
   maxLength?: number;
-  /** Resolve to close the dialog; throw/reject to keep it open (the caller shows the error). */
+  /** Resolve to close the dialog; throw/reject to keep it open (the dialog shows the error). */
   onSave: (value: string) => Promise<void>;
   onCancel: () => void;
 }
@@ -21,6 +23,7 @@ export default function RenameDialog({
 }: RenameDialogProps) {
   const [value, setValue] = useState(initialValue);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const trimmed = value.trim();
@@ -44,9 +47,11 @@ export default function RenameDialog({
     if (!trimmed || unchanged || saving) return;
 
     setSaving(true);
+    setError(null);
     try {
       await onSave(trimmed);
-    } catch {
+    } catch (err) {
+      setError(apiErrorMessage(err, "We couldn't save the new name. Please try again."));
       setSaving(false);
     }
   };
@@ -76,9 +81,14 @@ export default function RenameDialog({
           value={value}
           maxLength={maxLength}
           disabled={saving}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
           className="w-full px-3.5 py-2.5 rounded-lg bg-cream-50 dark:bg-navy-800 border border-cream-200 dark:border-white/10 text-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 disabled:opacity-60"
         />
+
+        <FormError message={error} className="mt-3" />
 
         <div className="flex justify-end gap-2 mt-6">
           <button

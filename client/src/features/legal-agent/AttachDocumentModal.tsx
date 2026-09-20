@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import toast from "react-hot-toast";
 import API from "../../services/api";
+import FormError from "../../components/ui/FormError";
+import { apiErrorMessage } from "../../services/apiError";
 
 interface AttachDocumentModalProps {
     onClose: () => void;
@@ -13,17 +14,19 @@ export default function AttachDocumentModal({ onClose, onAttached }: AttachDocum
     const [file, setFile] = useState<File | null>(null);
     const [text, setText] = useState("");
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async () => {
         if (mode === "file" && !file) {
-            toast.error("Please choose a file first");
+            setError("Please choose a file to attach first.");
             return;
         }
         if (mode === "text" && text.trim().length < 50) {
-            toast.error("Please paste at least 50 characters");
+            setError("Please paste at least 50 characters so there is enough text to work with.");
             return;
         }
 
+        setError(null);
         setLoading(true);
         try {
             let documentId: number;
@@ -40,8 +43,8 @@ export default function AttachDocumentModal({ onClose, onAttached }: AttachDocum
 
             onAttached(documentId);
             onClose();
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Upload failed");
+        } catch (err) {
+            setError(apiErrorMessage(err, "We couldn't attach your document. Please try again."));
         } finally {
             setLoading(false);
         }
@@ -88,7 +91,10 @@ export default function AttachDocumentModal({ onClose, onAttached }: AttachDocum
                         <input
                             type="file"
                             disabled={loading}
-                            onChange={(e) => setFile(e.target.files?.[0] || null)}
+                            onChange={(e) => {
+                                setFile(e.target.files?.[0] || null);
+                                setError(null);
+                            }}
                             className="hidden"
                         />
                         <span className="text-gray-500 dark:text-cream-100/50 truncate">
@@ -99,11 +105,16 @@ export default function AttachDocumentModal({ onClose, onAttached }: AttachDocum
                     <textarea
                         value={text}
                         disabled={loading}
-                        onChange={(e) => setText(e.target.value)}
+                        onChange={(e) => {
+                            setText(e.target.value);
+                            setError(null);
+                        }}
                         placeholder="Paste FIR text, agreement text, etc. (minimum 50 characters)"
                         className="w-full h-32 p-3 rounded-lg bg-cream-50 dark:bg-navy-950 border border-cream-200 dark:border-white/10 text-sm mb-4 focus:outline-none focus:border-gold-500"
                     />
                 )}
+
+                <FormError message={error} className="mb-4" />
 
                 <button
                     onClick={handleSubmit}

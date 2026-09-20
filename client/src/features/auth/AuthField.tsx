@@ -10,6 +10,8 @@ interface AuthFieldProps {
     isPassword?: boolean;
     autoComplete?: string;
     trailing?: React.ReactNode;
+    // Marks the field the current error is about (red border, announced to screen readers).
+    invalid?: boolean;
 }
 
 export default function AuthField({
@@ -22,6 +24,7 @@ export default function AuthField({
     isPassword,
     autoComplete,
     trailing,
+    invalid,
 }: AuthFieldProps) {
     const [revealed, setRevealed] = useState(false);
     const id = useId();
@@ -55,7 +58,12 @@ export default function AuthField({
                 autoComplete={autoComplete}
                 placeholder={placeholder}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg bg-cream-50 dark:bg-navy-800 text-navy-900 dark:text-white border border-cream-200 dark:border-white/10 focus:border-gold-500 dark:focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20 transition-colors disabled:opacity-50 placeholder:text-gray-400 dark:placeholder:text-cream-100/30"
+                aria-invalid={invalid || undefined}
+                className={`w-full px-3.5 py-2.5 rounded-lg bg-cream-50 dark:bg-navy-800 text-navy-900 dark:text-white border ${
+                    invalid
+                        ? "border-red-400 dark:border-red-500/70"
+                        : "border-cream-200 dark:border-white/10"
+                } focus:border-gold-500 dark:focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20 transition-colors disabled:opacity-50 placeholder:text-gray-400 dark:placeholder:text-cream-100/30`}
             />
         </div>
     );
