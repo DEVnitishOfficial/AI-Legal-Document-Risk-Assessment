@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Clock, Loader2, Mic, MicOff } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import type { ConsultationOptions, PublicAdvocate } from "./consultationApi";
 import { watchLevel } from "./audioLevel";
+import { useLocalCamera } from "./useLocalCamera";
+import SelfView from "./SelfView";
 
 interface Props {
   advocate: PublicAdvocate;
   options: ConsultationOptions;
   busy: boolean;
   error: string | null;
-  onJoin: (choice: { state: string; language: string }) => void;
+  onJoin: (choice: { state: string; language: string; camera: boolean; subject: string }) => void;
+  /** "human": a request to a real advocate (asks what it is about; different notice). */
+  mode?: "ai" | "human";
 }
 
 const fieldClass =
@@ -16,10 +20,14 @@ const fieldClass =
 
 // Pre-join screen: where the matter is, which language, a real microphone
 // test, and the consent the server insists on before any call is created.
-export default function LobbyPanel({ advocate, options, busy, error, onJoin }: Props) {
+export default function LobbyPanel({ advocate, options, busy, error, onJoin, mode = "ai" }: Props) {
+  const human = mode === "human";
+  const [subject, setSubject] = useState("");
   const [state, setState] = useState("IN");
   const [language, setLanguage] = useState("en");
   const [consent, setConsent] = useState(false);
+
+  const camera = useLocalCamera();
 
   const [testing, setTesting] = useState(false);
   const [level, setLevel] = useState(0);
@@ -66,7 +74,9 @@ export default function LobbyPanel({ advocate, options, busy, error, onJoin }: P
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     stopTest();
-    onJoin({ state, language });
+    const wantsCamera = camera.on;
+    camera.stop(); // released here; the call room turns it back on
+    onJoin({ state, language, camera: wantsCamera, subject: subject.trim() });
   };
 
   return (
@@ -84,7 +94,9 @@ export default function LobbyPanel({ advocate, options, busy, error, onJoin }: P
             ))}
           </select>
           <p className="text-[12px] text-gray-500 dark:text-cream-100/50 mt-1.5">
-            Only central law is loaded for now, so this helps the advocate flag where state rules may differ.
+            {human
+              ? "The advocate sees this, so they know whether they can help."
+              : "Only central law is loaded for now, so this helps the advocate flag where state rules may differ."}
           </p>
         </div>
         <div>
@@ -99,6 +111,59 @@ export default function LobbyPanel({ advocate, options, busy, error, onJoin }: P
             ))}
           </select>
         </div>
+      </div>
+
+      {human && (
+        <div>
+          <label htmlFor="c-subject" className="block text-[13px] font-medium mb-1.5">
+            What would you like to talk about?
+          </label>
+          <textarea
+            id="c-subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            maxLength={600}
+            rows={4}
+            required
+            placeholder="A sentence or two is enough — e.g. my landlord has not returned my security deposit."
+            className={`${fieldClass} leading-relaxed`}
+          />
+          <p className="text-[12px] text-gray-500 dark:text-cream-100/50 mt-1.5">
+            {subject.trim().length < 10
+              ? "The advocate reads this before deciding whether to accept (at least 10 characters)."
+              : `${600 - subject.length} characters left. Please don't include Aadhaar, PAN or bank details.`}
+          </p>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-cream-200 dark:border-white/10 bg-white dark:bg-navy-900 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[13px] font-medium">Would you like to turn on your camera?</p>
+            <p className="text-[12px] text-gray-500 dark:text-cream-100/50 mt-0.5 max-w-md">
+              Optional — it makes the call feel like a real one. Only you see it: the advocate is an AI that doesn't use video,
+              so nothing from your camera is sent or recorded.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={camera.toggle}
+            disabled={camera.busy}
+            aria-pressed={camera.on}
+            className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-cream-200 dark:border-white/15 px-3.5 py-2 text-sm font-medium hover:bg-cream-100 dark:hover:bg-navy-800 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-500"
+          >
+            {camera.busy ? <Loader2 size={15} className="animate-spin" /> : camera.on ? <VideoOff size={15} /> : <Video size={15} />}
+            {camera.on ? "Turn off" : "Turn on camera"}
+          </button>
+        </div>
+        {camera.on && (
+          <SelfView stream={camera.stream} name="You" muted={false} speaking={false} level={0} className="mt-3 w-full max-w-xs aspect-video" />
+        )}
+        {camera.error && (
+          <p role="status" className="text-[12.5px] text-risk-med-fg dark:text-risk-med-fg-dark mt-2">
+            {camera.error}
+          </p>
+        )}
       </div>
 
       <div className="rounded-xl border border-cream-200 dark:border-white/10 bg-white dark:bg-navy-900 p-4">
@@ -140,17 +205,34 @@ export default function LobbyPanel({ advocate, options, busy, error, onJoin }: P
 
       <fieldset className="rounded-xl border border-cream-200 dark:border-white/10 bg-cream-100/60 dark:bg-navy-900 p-4">
         <legend className="px-1 text-[13px] font-medium">Before you join</legend>
-        <ul className="text-[13px] leading-relaxed text-gray-700 dark:text-cream-100/75 space-y-1.5 list-disc pl-5 mb-3">
-          <li>
-            You will speak with <strong>{advocate.displayName}</strong>, an AI. It is not a human lawyer, cannot appear in
-            court, and gives general legal information, not legal advice.
-          </li>
-          <li>
-            Your voice is processed by OpenAI's speech service to run the call. NyayMitra saves a text transcript and a
-            summary in your account; you can delete them at any time.
-          </li>
-          <li>Please don't share Aadhaar, PAN, bank or card numbers on the call.</li>
-        </ul>
+        {human ? (
+          <ul className="text-[13px] leading-relaxed text-gray-700 dark:text-cream-100/75 space-y-1.5 list-disc pl-5 mb-3">
+            <li>
+              You are asking to speak with <strong>{advocate.displayName}</strong>, a real advocate. They will see what you write above,
+              your first name, your state and your language — not your email or phone number.
+            </li>
+            <li>
+              The call is a private video call between your device and theirs. NyayMitra does not record it. The advocate may
+              take notes, and can choose to share some of them with you afterwards.
+            </li>
+            <li>
+              What you are told is the advocate's own guidance; NyayMitra is only the platform that connects you. Please don't
+              share Aadhaar, PAN, bank or card numbers.
+            </li>
+          </ul>
+        ) : (
+          <ul className="text-[13px] leading-relaxed text-gray-700 dark:text-cream-100/75 space-y-1.5 list-disc pl-5 mb-3">
+            <li>
+              You will speak with <strong>{advocate.displayName}</strong>, an AI. It is not a human lawyer, cannot appear in
+              court, and gives general legal information, not legal advice.
+            </li>
+            <li>
+              Your voice is processed by OpenAI's speech service to run the call. NyayMitra saves a text transcript and a
+              summary in your account; you can delete them at any time.
+            </li>
+            <li>Please don't share Aadhaar, PAN, bank or card numbers on the call.</li>
+          </ul>
+        )}
         <label className="flex items-start gap-2.5 text-[13.5px] cursor-pointer">
           <input
             type="checkbox"
@@ -158,16 +240,22 @@ export default function LobbyPanel({ advocate, options, busy, error, onJoin }: P
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-1 h-4 w-4 accent-gold-500"
           />
-          <span>I understand this, and I agree to the call being transcribed and saved.</span>
+          <span>
+            {human
+              ? "I understand this, and I agree to share what I wrote above with the advocate."
+              : "I understand this, and I agree to the call being transcribed and saved."}
+          </span>
         </label>
       </fieldset>
 
-      <p className="flex items-center gap-2 text-[12.5px] text-gray-500 dark:text-cream-100/50">
-        <Clock size={14} />
-        {outOfMinutes
-          ? `You have used today's ${options.dailyMinutes} minutes of live consultation. Please come back tomorrow.`
-          : `${minutesLeft} of your ${options.dailyMinutes} daily minutes are left.`}
-      </p>
+      {!human && (
+        <p className="flex items-center gap-2 text-[12.5px] text-gray-500 dark:text-cream-100/50">
+          <Clock size={14} />
+          {outOfMinutes
+            ? `You have used today's ${options.dailyMinutes} minutes of live consultation. Please come back tomorrow.`
+            : `${minutesLeft} of your ${options.dailyMinutes} daily minutes are left.`}
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="rounded-lg bg-risk-high-bg dark:bg-risk-high-bg-dark text-risk-high-fg dark:text-risk-high-fg-dark p-3 text-sm">
@@ -177,11 +265,11 @@ export default function LobbyPanel({ advocate, options, busy, error, onJoin }: P
 
       <button
         type="submit"
-        disabled={!consent || busy || outOfMinutes}
+        disabled={!consent || busy || (!human && outOfMinutes) || (human && subject.trim().length < 10)}
         className="inline-flex items-center justify-center gap-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-navy-950 font-semibold text-sm px-6 py-3 transition-colors disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500"
       >
         {busy && <Loader2 size={16} className="animate-spin" />}
-        Join consultation
+        {human ? "Request consultation" : "Join consultation"}
       </button>
     </form>
   );

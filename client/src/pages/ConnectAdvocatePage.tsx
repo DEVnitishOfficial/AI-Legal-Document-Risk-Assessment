@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardCheck, History, Loader2, MessagesSquare, UserRound, Users } from "lucide-react";
+import { ClipboardCheck, History, Loader2, MessagesSquare, Users } from "lucide-react";
 import PageShell from "../features/consultation/PageShell";
 import PageIntro from "../components/layout/PageIntro";
 import AdvocateCard from "../features/consultation/AdvocateCard";
+import HumanAdvocatesSoonCard from "../features/consultation/HumanAdvocatesSoonCard";
 import { apiErrorMessage, consultationApi, type PublicAdvocate } from "../features/consultation/consultationApi";
 
 export default function ConnectAdvocatePage() {
@@ -12,10 +13,18 @@ export default function ConnectAdvocatePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    consultationApi
-      .advocates()
-      .then(setAdvocates)
-      .catch((err) => setError(apiErrorMessage(err, "Could not load advocates.")));
+    const load = () =>
+      consultationApi
+        .advocates()
+        .then((list) => {
+          setAdvocates(list);
+          setError(null);
+        })
+        .catch((err) => setError(apiErrorMessage(err, "Could not load advocates.")));
+    void load();
+    // Real advocates come and go, so their availability is refreshed while this page is open.
+    const timer = window.setInterval(() => void load(), 8000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const ai = advocates?.filter((a) => a.kind === "AI") ?? [];
@@ -58,60 +67,29 @@ export default function ConnectAdvocatePage() {
         )}
 
         {advocates && (
-          <>
-            <section aria-labelledby="ai-heading">
-              <h2
-                id="ai-heading"
-                className="font-mono text-[11px] tracking-[0.1em] uppercase text-gray-400 dark:text-cream-100/40 mb-3"
-              >
-                AI advocate
-              </h2>
-              {ai.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-cream-100/50">The AI advocate isn't available right now.</p>
-              ) : (
-                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 max-w-5xl">
-                  {ai.map((a) => (
-                    <AdvocateCard key={a.id} advocate={a} onStart={() => navigate(`/connect-advocate/join/${a.slug}`)} />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section aria-labelledby="human-heading">
-              <h2
-                id="human-heading"
-                className="font-mono text-[11px] tracking-[0.1em] uppercase text-gray-400 dark:text-cream-100/40 mb-3"
-              >
-                Human advocates
-              </h2>
-              {humans.length === 0 ? (
-                <div className="max-w-5xl rounded-xl border border-dashed border-cream-200 dark:border-white/15 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <span className="w-12 h-12 shrink-0 rounded-full border-2 border-dashed border-gold-500/60 text-gold-500 flex items-center justify-center">
-                    <UserRound size={22} />
-                  </span>
-                  <div className="flex-1">
-                    <p className="font-display text-base font-medium">Coming soon</p>
-                    <p className="text-sm text-gray-600 dark:text-cream-100/60 mt-0.5 max-w-2xl">
-                      Verified advocates, enrolled with their State Bar Council, will be listed here with their degrees,
-                      courts and languages, so you can talk to a real lawyer too.
-                    </p>
-                  </div>
-                  <button
-                    disabled
-                    className="rounded-lg border border-cream-200 dark:border-white/10 text-gray-400 dark:text-cream-100/40 text-sm font-medium px-5 py-2.5 cursor-not-allowed"
-                  >
-                    Coming soon
-                  </button>
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 max-w-5xl">
-                  {humans.map((a) => (
-                    <AdvocateCard key={a.id} advocate={a} unavailableLabel="Coming soon" />
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
+          // The AI advocate and the human advocates share one row of equal-sized cards.
+          <div className="grid gap-5 md:grid-cols-2 max-w-4xl items-start">
+            {ai.length === 0 && (
+              <p className="text-sm text-gray-500 dark:text-cream-100/50">The AI advocate isn't available right now.</p>
+            )}
+            {ai.map((a) => (
+              <AdvocateCard key={a.id} advocate={a} onStart={() => navigate(`/connect-advocate/join/${a.slug}`)} />
+            ))}
+            {humans.length === 0 ? (
+              <HumanAdvocatesSoonCard />
+            ) : (
+              humans.map((a) => (
+                <AdvocateCard
+                  key={a.id}
+                  advocate={a}
+                  onStart={a.availability === "AVAILABLE" ? () => navigate(`/connect-advocate/join/${a.slug}`) : undefined}
+                  unavailableLabel={
+                    a.availability === "AVAILABLE" ? undefined : a.availability === "BUSY" ? "In a consultation" : "Offline right now"
+                  }
+                />
+              ))
+            )}
+          </div>
         )}
       </div>
     </PageShell>

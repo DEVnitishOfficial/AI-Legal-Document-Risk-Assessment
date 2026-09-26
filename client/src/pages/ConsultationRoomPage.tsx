@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { ArrowLeft, Headset, Loader2 } from "lucide-react";
 import PageShell from "../features/consultation/PageShell";
 import CallRoom from "../features/consultation/CallRoom";
 import SummaryView from "../features/consultation/SummaryView";
 import { useConsultationCall } from "../features/consultation/useConsultationCall";
+import { useLocalCamera } from "../features/consultation/useLocalCamera";
 import { apiErrorMessage, consultationApi, type Consultation } from "../features/consultation/consultationApi";
 
 const IN_CALL = ["requesting-mic", "connecting", "live", "ending"];
@@ -18,6 +20,8 @@ export default function ConsultationRoomPage() {
   const autostarted = useRef(false);
 
   const call = useConsultationCall(id, setConsultation);
+  const camera = useLocalCamera();
+  const userName = useSelector((state: any) => state.auth.user?.name) || "You";
 
   const refresh = useCallback(async () => {
     try {
@@ -35,10 +39,18 @@ export default function ConsultationRoomPage() {
   useEffect(() => {
     if (location.state?.autostart && !autostarted.current && consultation?.status === "LOBBY" && call.phase === "idle") {
       autostarted.current = true;
+      const wantsCamera = !!location.state?.camera;
       navigate(location.pathname, { replace: true, state: null });
       void call.start();
+      if (wantsCamera) void camera.start();
     }
   }, [consultation, call, location, navigate]);
+
+  // The camera is only for the call: release it (and its indicator light) the moment the call is over.
+  useEffect(() => {
+    if (!IN_CALL.includes(call.phase)) camera.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call.phase]);
 
   // The summary is written right after the call ends; keep checking until it lands.
   useEffect(() => {
@@ -84,11 +96,14 @@ export default function ConsultationRoomPage() {
     );
   }
 
+  // A consultation with a real advocate has its own page.
+  if (consultation.advocateKind === "HUMAN") return <Navigate to={`/connect-advocate/human/${id}`} replace />;
+
   // A call in progress (or being set up / torn down) in this browser.
   if (IN_CALL.includes(call.phase)) {
     return (
       <PageShell>
-        <CallRoom consultation={consultation} call={call} />
+        <CallRoom consultation={consultation} call={call} camera={camera} userName={userName} />
       </PageShell>
     );
   }

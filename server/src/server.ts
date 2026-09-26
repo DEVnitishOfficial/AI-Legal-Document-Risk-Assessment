@@ -4,10 +4,12 @@ import { startRagScheduler } from "./modules/rag/rag.scheduler";
 import { promoteConfiguredAdmins } from "./modules/user/admin.bootstrap";
 import { ensureDefaultAiAdvocate } from "./modules/advocate/advocate.service";
 import { recoverStaleSessions, shutdownAll } from "./modules/consultation/consultation.realtime";
+import { attachHub } from "./modules/human/human.hub";
+import { startSweeper } from "./modules/human/human.service";
 
 const PORT = env.PORT;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   startRagScheduler();
 
@@ -17,7 +19,11 @@ app.listen(PORT, () => {
 
   // Live calls keep running (and billing) at OpenAI if this process dies, so hang up any left over.
   recoverStaleSessions().catch((err) => console.error("Consultation recovery failed:", err));
+
+  // Live calls with real advocates: the realtime hub (WebSocket on this port) and the timeout sweeper.
+  startSweeper();
 });
+attachHub(server);
 
 // End live calls cleanly on a normal shutdown; a crash is covered by the recovery above.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

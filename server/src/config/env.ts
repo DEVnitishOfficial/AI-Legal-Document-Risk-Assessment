@@ -21,6 +21,20 @@ export const env = {
   // Live voice consultations are billed per audio minute: each user gets this
   // many minutes per rolling 24 hours.
   DAILY_CONSULT_MINUTES: Math.max(1, Number(process.env.DAILY_CONSULT_MINUTES) || 30),
+  // ── Calls with real advocates ─────────────────────────────────────────────
+  HUMAN_CALL_MAX_MINUTES: Math.max(5, Number(process.env.HUMAN_CALL_MAX_MINUTES) || 45),
+  // How long an advocate has to respond, and to join once they have accepted.
+  HUMAN_REQUEST_TTL_SECONDS: Math.max(30, Number(process.env.HUMAN_REQUEST_TTL_SECONDS) || 180),
+  HUMAN_JOIN_TTL_SECONDS: Math.max(30, Number(process.env.HUMAN_JOIN_TTL_SECONDS) || 300),
+  // ICE servers for the browser-to-browser call. STUN alone works for most networks;
+  // a TURN relay is needed for the rest (strict office networks, some mobile carriers).
+  STUN_URLS: (process.env.STUN_URLS || "stun:stun.l.google.com:19302").split(",").map((u) => u.trim()).filter(Boolean),
+  TURN_URLS: (process.env.TURN_URLS || "").split(",").map((u) => u.trim()).filter(Boolean),
+  // coturn "use-auth-secret": time-limited credentials are derived from this secret.
+  TURN_SECRET: process.env.TURN_SECRET || "",
+  // Or fixed credentials from a managed TURN provider.
+  TURN_USERNAME: process.env.TURN_USERNAME || "",
+  TURN_CREDENTIAL: process.env.TURN_CREDENTIAL || "",
   // Comma-separated account emails promoted to ADMIN at server start. Additive
   // only: removing an email here does not demote — change the role in the DB.
   ADMIN_EMAILS: (process.env.ADMIN_EMAILS || "")

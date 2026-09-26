@@ -1418,3 +1418,88 @@ The server side of the live voice call with the NyayMitra AI Advocate. The brows
 ---
 
 **Follow-up (Phase 21b):** the advocate repeated its "I'm an AI and this is transcribed" introduction whenever the caller said "hello" again. A line in the prompt was not enough, so after its first spoken turn the server adds a short system note to the conversation ("you have already introduced yourself…", no response triggered). Re-run: the introduction is now given once.
+
+# 🗣️ Connect Advocate — Phase 5: Sounding Like a Person (Phase 22)
+
+---
+
+## 🔑 What changed
+
+* **Voice**: the AI advocate's default voice is now `marin` (one of the two Realtime-native voices, the most natural-sounding); the stored config was updated to match (`alloy` → `marin`, version bumped). Admins can still switch voices.
+* **Prompt** (`consultation.prompt.ts`): a "sound like a person, not a system" section — natural contractions and short sentences; acknowledge and show care before advising ("That sounds really stressful."); small varied acknowledgements while gathering facts; say "let me check the exact provision for you" before a lookup; slow down if the client is upset; never announce "option one, option two" like a menu. It may show care but must not claim a body, family or human experiences, and must say plainly that it is an AI if asked.
+* **Client's first name**: `consultation.service.ts` passes the account's first name into the instructions so the advocate can greet and address the client naturally. The name is user-typed text that reaches the model's instructions, so `safeFirstName` only lets a single plain-letters first name through (no digits, punctuation or sentences) — anything else is dropped.
+
+**Observed in a real call:** *"Hi Riya, I'm NyayMitra's AI Advocate — an AI, not a human lawyer — and this call is being transcribed. What's on your mind today?"* and, after the caller described a snatching, *"That sounds really upsetting, Riya. I'm sorry you had to go through that."*
+
+---
+
+# 🧑‍⚖️ Connect Advocate — Phase 6: Live Calls With Real Advocates (Phase 23)
+
+---
+
+## 📌 Overview
+
+Clients can now request a live video consultation with a **real, verified advocate**. The advocate has their own login and an **Advocate Desk**; a client's request reaches the desk instantly, the advocate accepts or declines, and the two browsers connect **directly** (WebRTC) — the server only introduces them, so **nothing is recorded**. Instant calls only for now (scheduling and payments are later phases).
+
+---
+
+## 🔑 How it works
+
+1. **Advocate account.** An admin links a human advocate's profile to their own NyayMitra login by email (`PUT/DELETE /admin/advocates/:id/account`; one account per advocate; the email is shown only in the admin shape, never in the public one). Only then can they open the Advocate Desk (`/advocate-desk/*`).
+2. **Presence** (`human.presence.ts`). An advocate is *online* only when they have switched **Available now** on **and** their desk is open in a browser. Closing the desk switches availability off after 30 s. Nothing is persisted, so after a restart everyone is offline until they choose otherwise — nobody can be listed as reachable without acting. Clients see `AVAILABLE / BUSY / OFFLINE` on the advocate's public profile.
+3. **Request → accept.** `POST /human-consultations` (consent required; state, language and a 10–600 character subject) creates a `REQUESTED` consultation and pushes it to the desk over the WebSocket hub. The advocate accepts (`ACCEPTED`) or declines with an optional reason; the client can cancel. Rules: advocate must be ACTIVE + VERIFIED + accepting + online, not busy, at most 5 waiting; one open consultation per client; nobody can request themselves. The advocate sees only a **first name and last initial**, state, language and the subject — never email or phone.
+4. **The call** (`human.hub.ts`, WebSocket on the API port, path `/ws`). Each connection authenticates with its first message (an unauthenticated one is closed after 8 s; a bad token immediately). Both parties `join` a room for their consultation (a stranger is refused); the server tells the advocate to make the WebRTC offer, relays offer / answer / ICE candidates (size-capped, participants only), and marks the call `LIVE` when the browsers report a connection. Each side also announces whether its camera is on. A second tab of the same person replaces the first. Messages are rate limited and dead connections are pruned by a heartbeat.
+5. **Limits and timeouts** (`human.service.ts::sweep`, every 10 s): unanswered requests expire after `HUMAN_REQUEST_TTL_SECONDS` (180), an accepted call nobody joins expires after `HUMAN_JOIN_TTL_SECONDS` (300), a call ends at `HUMAN_CALL_MAX_MINUTES` (45) with a 1-minute warning, and a live call both people left ends after 90 s — which also cleans up after a server restart.
+6. **After the call.** Duration and end reason are stored; the advocate keeps **private notes** and can write **notes for the client**, which the client sees only once the call has ended (`toPublic` never includes private notes). Human calls do not use the AI daily-minutes allowance, and the AI restart-recovery ignores them.
+7. **TURN** (`human.ice.ts`). `GET /human-consultations/:id/ice` and the hub's `joined` message carry the ICE servers: STUN always (`STUN_URLS`, Google's by default), plus TURN when `TURN_URLS` is set — with coturn time-limited credentials derived from `TURN_SECRET` (HMAC-SHA1), or fixed `TURN_USERNAME`/`TURN_CREDENTIAL` from a managed provider.
+
+New tables/columns (migration `20260921100000_add_human_consultations`): `advocates.user_id` (unique), consultation statuses `REQUESTED/ACCEPTED/DECLINED/EXPIRED/CANCELLED`, and `advocate_kind`, `subject`, `requested_at`, `responded_at`, `decline_reason`, `private_notes`, `shared_notes` on `consultations`.
+
+---
+
+## ✅ Result
+
+* **Server suite — 71 checks** (WebSocket + HTTP, throwaway accounts only): admin linking (403 for non-admins, unknown/duplicate/bad email refused, case-insensitive match, email never in the public shape); desk identity and access control; request validation; presence (going available needs an open desk; closing the desk makes the advocate OFFLINE at once); a request reaching the desk with only a first name + initial; queueing; decline / cancel / accept with instant notifications; BUSY while in a consultation; strangers cannot join or inject signals; offer/answer relay to the other party only; LIVE with a time limit; private vs shared notes; ended by the client; expiry of an unanswered request and of a no-show; a call past the limit ended by the server; a bad-token and a silent connection both closed. Your real advocates were verified untouched afterwards.
+* **TURN credentials — 5 checks**: STUN always present, TURN URLs included, `<expiry>:<userId>` username about an hour ahead, credential equals the coturn HMAC, different users get different credentials.
+* **Browser suite — 43 checks** (two real Chromium browsers, fake camera and microphone): see the client README (Phase 20).
+* **Found and fixed by the tests:** after a call ended the advocate's notes panel remounted with stale (empty) values and would have overwritten saved notes — see the client README.
+
+---
+
+## ⚠️ What to know before real users use it
+
+* **TURN is needed for some networks.** Without a relay, calls between two browsers fail on a share of connections (strict office networks, some mobile carriers). Set `TURN_URLS` + `TURN_SECRET` (a coturn server) or a managed provider's credentials before launch.
+* **Presence is held in this process**; running more than one server instance would need it moved to a shared store (e.g. Redis).
+* **Advocates must keep the desk open** to be reachable — there is no email/SMS/push alert yet (that needs your SMTP or an approved MSG91 template).
+* **No payments and no scheduling yet.** Consultations are instant and free; fees (e.g. Razorpay) and booked slots are later phases.
+* **Legal review first.** Bar Council of India rules restrict how advocates may advertise or solicit, and listing advocates on a platform may fall under them; get an opinion, and make sure each advocate has consented to be listed. Nothing here records calls, which supports confidentiality, but the consent text and retention of the subject line and notes should be reviewed (DPDP Act).
+* An operational note from testing: rapid repeated test runs on one Windows machine can exhaust ephemeral TCP ports (thousands of sockets in TIME_WAIT, mostly DNS lookups), which shows up as random 500s / `EADDRINUSE` until they drain — not an application fault.
+
+---
+
+# 💬 Plain-Language Messages for Sign-in, Registration and OTP (Phase 24)
+
+---
+
+## 📌 Overview
+
+The client now shows the server's message to the person (client README, Phase 21), so the messages themselves were rewritten for people, and one status code was corrected.
+
+---
+
+## 🔑 What changed
+
+* **Login** — `"User not registered, please register first"` → *"We couldn't find an account with this email. Please create an account first."* (still `404`); a wrong password → *"That password doesn't match this account. Please try again."* (still `401`).
+* **Register** — an email or mobile number that already has an account now returns **`409 Conflict`** (was `400`) with *"An account with this email/mobile number already exists. Please sign in instead."*; the client uses the `409` to offer *Sign in instead*.
+* **OTP** — *"Invalid OTP"*, *"OTP expired…"*, *"OTP not requested or already used"*, *"Too many attempts…"* and *"Please wait before requesting another OTP"* now say what happened and what to do.
+* **Google sign-in** (`auth.routes.ts`) — a failure redirects the browser to `/login?error=google` instead of returning raw JSON (the callback is a page navigation, not an API call). The debug `console.log`s that printed the signed-in user, **including their login token**, were removed.
+
+---
+
+## ✅ Result
+
+Verified through the browser suite in the client README (real `404`, `401` and `409` responses shown correctly). Server type-check clean. No API shape changed apart from the `400 → 409` on duplicate registration.
+
+**To pick this up:** restart the API — it runs as plain `ts-node` (no auto-reload), so a process started before this change still returns the old wording.
+
+---

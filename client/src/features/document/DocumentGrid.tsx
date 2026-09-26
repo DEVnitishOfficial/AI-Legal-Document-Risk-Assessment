@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { File, FileText, Star } from "lucide-react";
 import API from "../../services/api";
+import FormError from "../../components/ui/FormError";
+import { apiErrorMessage } from "../../services/apiError";
 import { RISK_LEVEL_BADGE } from "./riskStyles";
 import { documentDisplayName } from "./documentApi";
 import DocumentActionButtons from "./DocumentActionButtons";
@@ -32,13 +34,17 @@ const verdictFor = (doc: any): { label: string; className: string } => {
 export default function DocumentGrid({ onSelect, onDeleted, refreshKey, selectedId }: DocumentGridProps) {
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setLoadError(null);
     API.get("/documents/get-documents")
       .then((res) => setDocs(res.data.data))
+      .catch((err) => setLoadError(apiErrorMessage(err, "We couldn't load your documents.")))
       .finally(() => setLoading(false));
-  }, [refreshKey]);
+  }, [refreshKey, retryKey]);
 
   const actions = useDocumentActions({
     onUpdated: (updated) => setDocs((list) => list.map((d) => (d.id === updated.id ? { ...d, ...updated } : d))),
@@ -59,7 +65,19 @@ export default function DocumentGrid({ onSelect, onDeleted, refreshKey, selected
         </span>
       </div>
 
-      {!loading && docs.length === 0 && (
+      {loadError && (
+        <div className="mb-4">
+          <FormError message={loadError} />
+          <button
+            onClick={() => setRetryKey((k) => k + 1)}
+            className="mt-2 text-[13px] font-semibold text-gold-600 dark:text-gold-400 hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && docs.length === 0 && (
         <div className="rounded-xl border border-dashed border-cream-200 dark:border-white/15 py-12 text-center">
           <p className="font-display text-lg font-medium">No documents yet</p>
           <p className="text-sm text-gray-500 dark:text-cream-100/50 mt-1">

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Loader2, ImagePlus, Trash2, BadgeCheck } from "lucide-react";
+import FormError from "../../components/ui/FormError";
 import { advocateAdminApi, apiErrorMessage } from "./advocateApi";
 import { BTN_GHOST, BTN_PRIMARY, Field, INPUT, Section, listToText, textToList } from "./formControls";
 
@@ -8,6 +9,8 @@ interface Props {
   /** null → creating a new advocate. */
   advocate: any | null;
   onSaved: (advocate: any) => void;
+  /** Called only after the main Save / Create succeeds (not for photo changes), e.g. to close the editor. */
+  onSubmitted?: (advocate: any) => void;
 }
 
 const Initials = ({ name }: { name: string }) => (
@@ -16,7 +19,7 @@ const Initials = ({ name }: { name: string }) => (
   </span>
 );
 
-export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
+export default function AdvocateProfileForm({ advocate, onSaved, onSubmitted }: Props) {
   const creating = advocate === null;
   const [kind, setKind] = useState<"AI" | "HUMAN">(advocate?.kind ?? "HUMAN");
   const isAi = kind === "AI";
@@ -37,6 +40,9 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
   });
   const [saving, setSaving] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  // Shown beside the control that failed, not in a toast that can vanish unread.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
@@ -44,6 +50,7 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
     try {
       const body: any = {
         displayName: form.displayName,
@@ -75,8 +82,9 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
         acceptingConsultations: saved.acceptingConsultations,
       });
       onSaved(saved);
+      onSubmitted?.(saved);
     } catch (err) {
-      toast.error(apiErrorMessage(err, "Couldn't save advocate"));
+      setSaveError(apiErrorMessage(err, "We couldn't save this advocate. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -85,11 +93,12 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
   const pickPhoto = async (file?: File) => {
     if (!file || !advocate) return;
     setPhotoBusy(true);
+    setPhotoError(null);
     try {
       onSaved(await advocateAdminApi.uploadPhoto(advocate.id, file));
       toast.success("Photo updated");
     } catch (err) {
-      toast.error(apiErrorMessage(err, "Couldn't upload photo"));
+      setPhotoError(apiErrorMessage(err, "We couldn't upload that photo. Please try again."));
     } finally {
       setPhotoBusy(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -99,10 +108,11 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
   const removePhoto = async () => {
     if (!advocate) return;
     setPhotoBusy(true);
+    setPhotoError(null);
     try {
       onSaved(await advocateAdminApi.removePhoto(advocate.id));
     } catch (err) {
-      toast.error(apiErrorMessage(err, "Couldn't remove photo"));
+      setPhotoError(apiErrorMessage(err, "We couldn't remove the photo. Please try again."));
     } finally {
       setPhotoBusy(false);
     }
@@ -149,6 +159,7 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
               </div>
             </div>
           )}
+          {advocate && <FormError message={photoError} />}
 
           {creating && (
             <Field label="Type">
@@ -234,6 +245,8 @@ export default function AdvocateProfileForm({ advocate, onSaved }: Props) {
           )}
         </Section>
       )}
+
+      <FormError message={saveError} />
 
       <div className="flex items-center gap-3">
         <button type="submit" className={BTN_PRIMARY} disabled={saving || !form.displayName.trim()}>

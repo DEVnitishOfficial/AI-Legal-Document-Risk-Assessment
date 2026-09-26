@@ -1,15 +1,18 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
+import FormError from "../../components/ui/FormError";
 import { advocateAdminApi, apiErrorMessage, REALTIME_MODELS, REALTIME_VOICES } from "./advocateApi";
 import { BTN_PRIMARY, Field, INPUT, Section } from "./formControls";
 
 interface Props {
   advocate: any;
   onChange: (advocate: any) => void;
+  /** Called after the configuration is saved, e.g. to close the editor. */
+  onSubmitted?: (advocate: any) => void;
 }
 
-export default function AiConfigEditor({ advocate, onChange }: Props) {
+export default function AiConfigEditor({ advocate, onChange, onSubmitted }: Props) {
   const cfg = advocate.aiConfig;
   const [form, setForm] = useState({
     model: cfg.model,
@@ -21,25 +24,27 @@ export default function AiConfigEditor({ advocate, onChange }: Props) {
     personaPrompt: cfg.personaPrompt ?? "",
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     try {
-      onChange(
-        await advocateAdminApi.saveAiConfig(advocate.id, {
-          model: form.model,
-          voice: form.voice,
-          temperature: Number(form.temperature),
-          maxSessionMinutes: Number(form.maxSessionMinutes),
-          ragConfig: { k: Number(form.k), minSimilarity: Number(form.minSimilarity) },
-          personaPrompt: form.personaPrompt,
-        })
-      );
+      const saved = await advocateAdminApi.saveAiConfig(advocate.id, {
+        model: form.model,
+        voice: form.voice,
+        temperature: Number(form.temperature),
+        maxSessionMinutes: Number(form.maxSessionMinutes),
+        ragConfig: { k: Number(form.k), minSimilarity: Number(form.minSimilarity) },
+        personaPrompt: form.personaPrompt,
+      });
+      onChange(saved);
       toast.success("AI configuration saved — applies to new consultations");
+      onSubmitted?.(saved);
     } catch (err) {
-      toast.error(apiErrorMessage(err, "Couldn't save AI configuration"));
+      setError(apiErrorMessage(err, "We couldn't save the AI configuration. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -90,6 +95,8 @@ export default function AiConfigEditor({ advocate, onChange }: Props) {
         >
           <textarea className={`${INPUT} h-32`} maxLength={4000} value={form.personaPrompt} onChange={(e) => set({ personaPrompt: e.target.value })} />
         </Field>
+
+        <FormError message={error} />
 
         <button type="submit" className={BTN_PRIMARY} disabled={saving}>
           {saving && <Loader2 size={14} className="animate-spin inline mr-1.5" />}

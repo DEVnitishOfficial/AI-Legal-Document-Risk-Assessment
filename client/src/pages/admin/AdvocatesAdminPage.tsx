@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Bot, UserRound, BadgeCheck } from "lucide-react";
+import { Plus, Bot, UserRound, BadgeCheck, X } from "lucide-react";
 import Sidebar from "../../components/layout/Sidebar";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import AdvocateProfileForm from "../../features/admin/AdvocateProfileForm";
 import CredentialsEditor from "../../features/admin/CredentialsEditor";
 import AiConfigEditor from "../../features/admin/AiConfigEditor";
+import AccountLinkEditor from "../../features/admin/AccountLinkEditor";
 import { advocateAdminApi, apiErrorMessage } from "../../features/admin/advocateApi";
 import { BTN_DANGER, BTN_PRIMARY, Section } from "../../features/admin/formControls";
 
@@ -16,6 +17,24 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 type Selection = number | "new" | null;
+
+// Title row of the editor, with a close button at the top right.
+function EditorHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <h2 className="font-display text-xl font-medium min-w-0 break-words">{title}</h2>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close editor"
+        title="Close"
+        className="shrink-0 p-2 -mr-2 -mt-1 rounded-lg text-gray-500 dark:text-cream-100/60 hover:bg-cream-100 dark:hover:bg-navy-800 hover:text-navy-950 dark:hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-500"
+      >
+        <X size={20} />
+      </button>
+    </div>
+  );
+}
 
 export default function AdvocatesAdminPage() {
   const [advocates, setAdvocates] = useState<any[]>([]);
@@ -41,6 +60,9 @@ export default function AdvocatesAdminPage() {
     );
     setSelection(advocate.id);
   };
+
+  // Closing the editor leaves the list as it is; unsaved edits in the panel are discarded.
+  const close = () => setSelection(null);
 
   const remove = async () => {
     if (!selected) return;
@@ -136,18 +158,20 @@ export default function AdvocatesAdminPage() {
 
               {selection === "new" && (
                 <div className="space-y-5">
-                  <h2 className="font-display text-xl font-medium">New advocate</h2>
+                  <EditorHeader title="New advocate" onClose={close} />
+                  {/* Stays open after creating: a new advocate still needs its credentials added. */}
                   <AdvocateProfileForm key="new" advocate={null} onSaved={upsert} />
                 </div>
               )}
 
               {selected && (
                 <div className="space-y-5">
-                  <h2 className="font-display text-xl font-medium">{selected.displayName}</h2>
-                  <AdvocateProfileForm key={`p-${selected.id}`} advocate={selected} onSaved={upsert} />
+                  <EditorHeader title={selected.displayName} onClose={close} />
+                  <AdvocateProfileForm key={`p-${selected.id}`} advocate={selected} onSaved={upsert} onSubmitted={close} />
                   <CredentialsEditor key={`c-${selected.id}`} advocate={selected} onChange={upsert} />
+                  {selected.kind === "HUMAN" && <AccountLinkEditor key={`l-${selected.id}`} advocate={selected} onChange={upsert} />}
                   {selected.kind === "AI" && selected.aiConfig && (
-                    <AiConfigEditor key={`a-${selected.id}`} advocate={selected} onChange={upsert} />
+                    <AiConfigEditor key={`a-${selected.id}`} advocate={selected} onChange={upsert} onSubmitted={close} />
                   )}
                   <Section title="Delete advocate" description="Removes the profile, credentials and photo permanently. Prefer Disabled if you may want them back.">
                     <button className={BTN_DANGER} onClick={() => setConfirmDelete(true)}>

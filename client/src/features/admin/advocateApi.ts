@@ -16,6 +16,8 @@ export const advocateAdminApi = {
     unwrap(await API.patch(`/admin/advocates/${id}/credentials/${credentialId}`, body)),
   deleteCredential: async (id: number, credentialId: number) =>
     unwrap(await API.delete(`/admin/advocates/${id}/credentials/${credentialId}`)),
+  linkAccount: async (id: number, email: string) => unwrap(await API.put(`/admin/advocates/${id}/account`, { email })),
+  unlinkAccount: async (id: number) => unwrap(await API.delete(`/admin/advocates/${id}/account`)),
   saveAiConfig: async (id: number, body: any) => unwrap(await API.put(`/admin/advocates/${id}/ai-config`, body)),
   uploadPhoto: async (id: number, file: File) => {
     const form = new FormData();
@@ -42,4 +44,5 @@ export const CREDENTIAL_LABELS: Record<string, string> = {
   LAST_VERIFIED: "Last verified",
 };
 
-export const apiErrorMessage = (err: any, fallback: string) => err?.response?.data?.message || fallback;
+// Kept here because many screens import it from this module; the logic lives in services/apiError.
+export { apiErrorMessage } from "../../services/apiError";

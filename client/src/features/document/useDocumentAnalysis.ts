@@ -1,6 +1,7 @@
 import { useState } from "react";
 import API from "../../services/api";
 import toast from "react-hot-toast";
+import { apiErrorMessage } from "../../services/apiError";
 
 export function useDocumentAnalysis() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -22,8 +23,8 @@ export function useDocumentAnalysis() {
       if (!res.data.data.cached) {
         bumpRefresh();
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Analysis failed");
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "We couldn't analyze this document. Please try again."));
     } finally {
       setAnalyzing(false);
     }

@@ -1,18 +1,34 @@
 import { useDispatch } from "react-redux";
 import { loginUser, sendOtp, verifyOtp } from "../features/auth/authSlice";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AuthShell from "../features/auth/AuthShell";
 import CaseFileCard from "../features/auth/CaseFileCard";
 import AuthTabs, { type AuthMethod } from "../features/auth/AuthTabs";
 import AuthField from "../features/auth/AuthField";
+import AuthNotice, { type AuthNoticeData } from "../features/auth/AuthNotice";
 import { API_BASE_URL } from "../services/api";
+import { SESSION_EXPIRED_MESSAGE, type ApiFailure } from "../services/apiError";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Why the person is on this page without having asked to be: shown before they type anything.
+const arrivalNotice = (reason: unknown, search: string): AuthNoticeData | null => {
+    if (reason === "expired") return { kind: "info", message: SESSION_EXPIRED_MESSAGE };
+    if (new URLSearchParams(search).get("error") === "google") {
+        return {
+            kind: "error",
+            message: "We couldn't complete sign-in with Google. Please try again, or sign in with your email or mobile number.",
+        };
+    }
+    return null;
+};
 
 export default function Login() {
     const dispatch = useDispatch<any>();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [method, setMethod] = useState<AuthMethod>("email");
     const [form, setForm] = useState({ email: "", password: "" });
@@ -22,37 +38,57 @@ export default function Login() {
     const [keepSignedIn, setKeepSignedIn] = useState(true);
 
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<AuthNoticeData | null>(() =>
+        arrivalNotice((location.state as { reason?: string } | null)?.reason, location.search)
+    );
+    // Which field the current message is about, so it can be outlined.
+    const [badField, setBadField] = useState<"email" | "password" | null>(null);
+
+    const showError = (message: string, field: "email" | "password" | null = null) => {
+        setNotice({ kind: "error", message });
+        setBadField(field);
+    };
+    const clearNotice = () => {
+        setNotice(null);
+        setBadField(null);
+    };
 
     const handleLogin = async () => {
-        if (!form.email || !form.password) {
-            setError("Please fill in all fields.");
-            return;
-        }
+        if (!form.email.trim()) return showError("Please enter your email address.", "email");
+        if (!EMAIL_PATTERN.test(form.email.trim())) return showError("That doesn't look like a valid email address. Please check it and try again.", "email");
+        if (!form.password) return showError("Please enter your password.", "password");
 
         try {
             setIsLoading(true);
-            setError(null);
+            clearNotice();
 
-            await dispatch(loginUser(form)).unwrap();
+            await dispatch(loginUser({ email: form.email.trim(), password: form.password })).unwrap();
 
             toast.success("Login successful!");
             navigate("/dashboard");
-        } catch (err: any) {
-            setError(err?.message || "Invalid email or password. Please try again.");
+        } catch (err) {
+            const { message, status } = err as ApiFailure;
+            if (status === 404) {
+                // No account with this email: the fix is to register, so offer it right there.
+                setNotice({
+                    kind: "error",
+                    message,
+                    action: { label: "Create an account", onClick: () => navigate("/register", { state: { email: form.email.trim() } }) },
+                });
+                setBadField("email");
+            } else {
+                showError(message, status === 401 ? "password" : null);
+            }
             setIsLoading(false);
         }
     };
 
     const handlePhoneSubmit = async () => {
-        if (!phone.trim()) {
-            toast.error("Enter your mobile number first");
-            return;
-        }
+        if (!phone.trim()) return showError("Please enter your mobile number.");
 
         try {
             setIsLoading(true);
-            setError(null);
+            clearNotice();
 
             const result = await dispatch(sendOtp({ phone })).unwrap();
 
@@ -63,29 +99,26 @@ export default function Login() {
                 toast.success("OTP sent to your mobile number.");
             }
             setOtpStep("code");
-        } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || "Failed to send OTP. Please try again.");
+        } catch (err) {
+            showError((err as ApiFailure).message);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleOtpVerify = async () => {
-        if (!otpCode.trim()) {
-            toast.error("Enter the OTP you received");
-            return;
-        }
+        if (!otpCode.trim()) return showError("Please enter the code we sent you.");
 
         try {
             setIsLoading(true);
-            setError(null);
+            clearNotice();
 
             await dispatch(verifyOtp({ phone, code: otpCode })).unwrap();
 
             toast.success("Login successful!");
             navigate("/dashboard");
-        } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || "Invalid or expired OTP. Please try again.");
+        } catch (err) {
+            showError((err as ApiFailure).message);
             setIsLoading(false);
         }
     };
@@ -105,20 +138,15 @@ export default function Login() {
                     Access your case workspace and document history.
                 </p>
 
-                <AuthTabs value={method} onChange={setMethod} />
+                <AuthTabs
+                    value={method}
+                    onChange={(m) => {
+                        setMethod(m);
+                        clearNotice();
+                    }}
+                />
 
-                <AnimatePresence>
-                    {error && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-red-700 bg-red-50 border border-red-200 dark:text-red-400 dark:bg-red-950/50 dark:border-red-800/50 p-3 rounded-lg mb-4 overflow-hidden"
-                        >
-                            {error}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <AuthNotice notice={notice} />
 
                 {method === "email" ? (
                     <>
@@ -127,18 +155,26 @@ export default function Login() {
                             type="email"
                             value={form.email}
                             disabled={isLoading}
+                            invalid={badField === "email"}
                             placeholder="you@example.com"
                             autoComplete="email"
-                            onChange={(v) => setForm({ ...form, email: v })}
+                            onChange={(v) => {
+                                setForm({ ...form, email: v });
+                                if (badField === "email") clearNotice();
+                            }}
                         />
                         <AuthField
                             label="Password"
                             isPassword
                             value={form.password}
                             disabled={isLoading}
+                            invalid={badField === "password"}
                             placeholder="Enter your password"
                             autoComplete="current-password"
-                            onChange={(v) => setForm({ ...form, password: v })}
+                            onChange={(v) => {
+                                setForm({ ...form, password: v });
+                                if (badField === "password") clearNotice();
+                            }}
                         />
 
                         <div className="flex items-center justify-between mb-6 text-sm">
@@ -221,7 +257,7 @@ export default function Login() {
                             onClick={() => {
                                 setOtpStep("phone");
                                 setOtpCode("");
-                                setError(null);
+                                clearNotice();
                             }}
                             className="w-full text-sm text-gold-600 dark:text-gold-400 hover:underline mb-5"
                         >

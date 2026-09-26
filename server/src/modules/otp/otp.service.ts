@@ -21,7 +21,7 @@ export const sendOtp = async (phone: string) => {
 
   const latest = await otpRepo.findLatestOtpForPhone(phone);
   if (latest && Date.now() - latest.lastSentAt.getTime() < RESEND_COOLDOWN_MS) {
-    throw new AppError("Please wait before requesting another OTP", 429);
+    throw new AppError("A code was sent recently. Please wait a moment before requesting another.", 429);
   }
 
   const code = crypto.randomInt(100000, 1000000).toString();
@@ -42,21 +42,21 @@ export const verifyOtp = async (phone: string, code: string) => {
 
   const otp = await otpRepo.findLatestOtpForPhone(phone);
   if (!otp) {
-    throw new AppError("OTP not requested or already used", 400);
+    throw new AppError("This code was already used, or no code was requested for this number. Please request a new one.", 400);
   }
 
   if (otp.expiresAt.getTime() < Date.now()) {
-    throw new AppError("OTP expired, please request a new one", 400);
+    throw new AppError("This code has expired. Please request a new one.", 400);
   }
 
   if (otp.attempts >= MAX_ATTEMPTS) {
-    throw new AppError("Too many attempts, please request a new OTP", 429);
+    throw new AppError("Too many wrong attempts. Please request a new code.", 429);
   }
 
   const isMatch = await bcrypt.compare(code, otp.codeHash);
   if (!isMatch) {
     await otpRepo.incrementAttempts(otp.id);
-    throw new AppError("Invalid OTP", 401);
+    throw new AppError("That code isn't correct. Please check it and try again.", 401);
   }
 
   await otpRepo.markConsumed(otp.id);

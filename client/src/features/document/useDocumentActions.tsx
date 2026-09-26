@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import RenameDialog from "../../components/ui/RenameDialog";
+import { apiErrorMessage } from "../../services/apiError";
 import DocumentViewerModal from "../legal-agent/DocumentViewerModal";
 import {
   renameDocument,
@@ -17,7 +18,7 @@ interface UseDocumentActionsOptions {
   onDeleted: (id: number) => void;
 }
 
-const errorMessage = (err: any, fallback: string) => err?.response?.data?.message || fallback;
+const errorMessage = apiErrorMessage;
 
 // The document actions shared by every screen that lists documents. Returns
 // the action functions plus the dialogs they open — render `dialogs` once.
@@ -25,6 +26,7 @@ export function useDocumentActions({ onUpdated, onDeleted }: UseDocumentActionsO
   const [renaming, setRenaming] = useState<any | null>(null);
   const [deleting, setDeleting] = useState<any | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
 
   const toggleFavorite = async (doc: any) => {
@@ -46,21 +48,21 @@ export function useDocumentActions({ onUpdated, onDeleted }: UseDocumentActionsO
       toast.success("Document renamed");
       setRenaming(null);
     } catch (err) {
-      toast.error(errorMessage(err, "Couldn't rename document"));
-      throw err; // keeps the dialog open
+      throw err; // keeps the dialog open, which shows the reason itself
     }
   };
 
   const confirmDelete = async () => {
     if (!deleting) return;
     setDeleteBusy(true);
+    setDeleteError(null);
     try {
       await deleteDocument(deleting.id);
       onDeleted(deleting.id);
       toast.success("Document deleted");
       setDeleting(null);
     } catch (err) {
-      toast.error(errorMessage(err, "Couldn't delete document"));
+      setDeleteError(errorMessage(err, "We couldn't delete this document. Please try again."));
     } finally {
       setDeleteBusy(false);
     }
@@ -81,6 +83,7 @@ export function useDocumentActions({ onUpdated, onDeleted }: UseDocumentActionsO
         <ConfirmDialog
           danger
           busy={deleteBusy}
+          error={deleteError}
           title="Delete this document?"
           message={`“${documentDisplayName(deleting)}” and its analysis report will be permanently deleted. This can't be undone.`}
           confirmLabel="Delete document"
@@ -97,7 +100,10 @@ export function useDocumentActions({ onUpdated, onDeleted }: UseDocumentActionsO
   return {
     toggleFavorite,
     rename: (doc: any) => setRenaming(doc),
-    remove: (doc: any) => setDeleting(doc),
+    remove: (doc: any) => {
+      setDeleteError(null);
+      setDeleting(doc);
+    },
     view: (doc: any) => setViewingId(doc.id),
     dialogs,
   };

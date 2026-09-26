@@ -5,23 +5,15 @@ import { env } from "../../config/env";
 const router = Router();
 
 // Step 1: Redirect to Google
-router.get("/google", (req, res, next) => {
-  console.log("Google route hit");
-  next();
-}, passport.authenticate("google", { scope: ["profile", "email"] }));
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
 router.get("/google/callback", (req, res, next) => {
-  passport.authenticate("google", { session: false }, (err, user, info) => {
-    console.log("ERR:", err);
-    console.log("USER:", user);
-    console.log("INFO:", info);
-
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
-    if (!user) {
-      return res.status(401).json({ error: "No user returned" });
+  passport.authenticate("google", { session: false }, (err, user) => {
+    // This is a browser navigation, not an API call, so a failure must land the person back
+    // on the sign-in page (which explains it) rather than on a page of raw JSON.
+    if (err || !user) {
+      if (err) console.error("Google sign-in failed:", err.message);
+      return res.redirect(`${env.CLIENT_URL}/login?error=google`);
     }
 
     const { token } = user;

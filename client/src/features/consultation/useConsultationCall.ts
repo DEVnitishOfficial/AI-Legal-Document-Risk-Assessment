@@ -48,6 +48,9 @@ export function useConsultationCall(consultationId: number, onEnded?: (c: Consul
   const [advocateLevel, setAdvocateLevel] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [limitSec, setLimitSec] = useState<number | null>(null);
+  const [caption, setCaption] = useState("");
+  const captionRef = useRef("");
+  const captionTimer = useRef<number | null>(null);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -79,9 +82,12 @@ export function useConsultationCall(consultationId: number, onEnded?: (c: Consul
       audioRef.current.srcObject = null;
       audioRef.current = null;
     }
+    if (captionTimer.current) window.clearTimeout(captionTimer.current);
+    captionRef.current = "";
     if (mounted.current) {
       setMicLevel(0);
       setAdvocateLevel(0);
+      setCaption("");
     }
   }, []);
 
@@ -136,7 +142,29 @@ export function useConsultationCall(consultationId: number, onEnded?: (c: Consul
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      pc.createDataChannel("oai-events");
+      // Events from the call, used only to show live captions of what the advocate is saying.
+      const dc = pc.createDataChannel("oai-events");
+      dc.onmessage = (msg) => {
+        let ev: any;
+        try {
+          ev = JSON.parse(msg.data);
+        } catch {
+          return;
+        }
+        if (ev.type === "response.created") {
+          captionRef.current = "";
+          setCaption("");
+        } else if (ev.type === "response.output_audio_transcript.delta" && typeof ev.delta === "string") {
+          captionRef.current += ev.delta;
+          setCaption(captionRef.current.slice(-240));
+        } else if (ev.type === "response.output_audio_transcript.done") {
+          if (captionTimer.current) window.clearTimeout(captionTimer.current);
+          const shown = captionRef.current;
+          captionTimer.current = window.setTimeout(() => {
+            if (captionRef.current === shown) setCaption("");
+          }, 6000);
+        }
+      };
 
       // Created inside the click that started the call, so the browser allows playback.
       const audio = new Audio();
@@ -208,5 +236,18 @@ export function useConsultationCall(consultationId: number, onEnded?: (c: Consul
     };
   }, [consultationId, teardown]);
 
-  return { phase, error, muted, turns, micLevel, advocateLevel, elapsedSec, limitSec, start, hangup, toggleMute };
+  return {
+    phase,
+    error,
+    muted,
+    turns,
+    micLevel,
+    advocateLevel,
+    caption,
+    elapsedSec,
+    limitSec,
+    start,
+    hangup,
+    toggleMute,
+  };
 }

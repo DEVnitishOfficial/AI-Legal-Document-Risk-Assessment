@@ -27,14 +27,26 @@ export interface PublicAdvocate {
   yearsExperience: number | null;
   verificationStatus: "UNVERIFIED" | "VERIFIED";
   acceptingConsultations: boolean;
+  /** Human advocates only: whether they can be reached right now. */
+  availability?: "AVAILABLE" | "BUSY" | "OFFLINE" | null;
   credentials: PublicCredential[];
 }
 
-export type ConsultationStatus = "LOBBY" | "LIVE" | "ENDED" | "FAILED";
+export type ConsultationStatus =
+  | "LOBBY"
+  | "LIVE"
+  | "ENDED"
+  | "FAILED"
+  | "REQUESTED"
+  | "ACCEPTED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "CANCELLED";
 
 export interface Consultation {
   id: number;
   advocate: { id: number | null; name: string };
+  advocateKind: "AI" | "HUMAN";
   state: string;
   stateName: string;
   language: string;
@@ -47,11 +59,19 @@ export interface Consultation {
   summaryStatus: "NONE" | "PENDING" | "READY" | "FAILED" | "SKIPPED";
   createdAt: string;
   summary?: ConsultationSummary | null;
+  // Human consultations
+  subject?: string | null;
+  requestedAt?: string | null;
+  expiresAt?: string | null;
+  declineReason?: string | null;
+  sharedNotes?: string | null;
 }
 
 export interface ConsultationListItem {
   id: number;
   advocateName: string;
+  advocateKind: "AI" | "HUMAN";
+  subject?: string | null;
   state: string;
   language: string;
   status: ConsultationStatus;
@@ -144,4 +164,10 @@ export const END_REASON_LABELS: Record<string, string> = {
   left_lobby: "Left before joining",
   superseded: "Replaced by a newer consultation",
   lobby_expired: "Never joined",
+  user_cancelled: "You cancelled the request",
+  declined: "The advocate declined",
+  no_response: "The advocate did not respond in time",
+  no_show: "Accepted, but the call was never joined",
+  advocate_ended: "The advocate ended the call",
+  user_left: "You left before the call started",
 };

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { UploadCloud, FileCheck2 } from "lucide-react";
 import API from "../../services/api";
 import toast from "react-hot-toast";
+import FormError from "../../components/ui/FormError";
+import { apiErrorMessage } from "../../services/apiError";
 
 interface UploadPanelProps {
   onUploaded: (documentId: number) => void;
@@ -13,18 +15,20 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleUpload = async () => {
     if (mode === "file" && !file) {
-      toast.error("Please choose a file first");
+      setError("Please choose a file to upload first.");
       return;
     }
 
     if (mode === "text" && text.trim().length < 50) {
-      toast.error("Please paste at least 50 characters");
+      setError("Please paste at least 50 characters so there is enough text to analyze.");
       return;
     }
 
+    setError(null);
     setLoading(true);
     try {
       let documentId: number;
@@ -44,8 +48,8 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
 
       toast.success("Uploaded successfully 🚀");
       onUploaded(documentId);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Upload failed");
+    } catch (err) {
+      setError(apiErrorMessage(err, "We couldn't upload your document. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -89,7 +93,10 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
             type="file"
             className="hidden"
             disabled={loading || disabled}
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] || null);
+              setError(null);
+            }}
           />
           {file ? (
             <>
@@ -114,9 +121,14 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
           placeholder="Paste your terms and conditions here... (minimum 50 characters)"
           className="w-full h-32 p-3 rounded-lg bg-cream-50 border border-cream-200 dark:bg-navy-950 dark:border-white/10 text-navy-950 dark:text-cream-50 mb-4 text-[13.5px] focus:outline-none focus:border-gold-500"
           disabled={loading || disabled}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError(null);
+          }}
         />
       )}
+
+      <FormError message={error} className="mb-4" />
 
       {/* ACTION */}
       <button

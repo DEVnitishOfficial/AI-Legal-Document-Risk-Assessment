@@ -17,6 +17,8 @@ export const listConsultations = (userId: number) =>
         select: {
             id: true,
             advocateName: true,
+            advocateKind: true,
+            subject: true,
             state: true,
             language: true,
             status: true,
@@ -31,9 +33,11 @@ export const listConsultations = (userId: number) =>
 export const deleteConsultation = (id: number) => prisma.consultation.delete({ where: { id } });
 
 export const findOpenConsultationForUser = (userId: number) =>
-    prisma.consultation.findFirst({ where: { userId, status: { in: ["LOBBY", "LIVE"] } }, orderBy: { id: "desc" } });
+    prisma.consultation.findFirst({ where: { userId, status: { in: ["LOBBY", "LIVE", "REQUESTED", "ACCEPTED"] } }, orderBy: { id: "desc" } });
 
-export const findLiveConsultations = () => prisma.consultation.findMany({ where: { status: "LIVE" } });
+// AI calls only: human calls have no server-side session to recover and are handled by the human-call sweeper.
+export const findLiveConsultations = () =>
+    prisma.consultation.findMany({ where: { status: "LIVE", advocateKind: "AI" } });
 
 export const failStaleLobbies = (olderThan: Date) =>
     prisma.consultation.updateMany({
@@ -44,7 +48,8 @@ export const failStaleLobbies = (olderThan: Date) =>
 // Rolling 24 hours, so the daily allowance doesn't depend on the server's timezone.
 export const secondsUsedSince = async (userId: number, since: Date): Promise<number> => {
     const rows = await prisma.consultation.aggregate({
-        where: { userId, status: "ENDED", endedAt: { gte: since } },
+        // Only AI calls cost money, so only they count against the daily allowance.
+        where: { userId, status: "ENDED", advocateKind: "AI", endedAt: { gte: since } },
         _sum: { durationSec: true },
     });
     return rows._sum.durationSec ?? 0;

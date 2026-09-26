@@ -19,6 +19,7 @@ model User {
   documents     Document[]
   conversations Conversation[]
   consultations Consultation[]
+  advocateProfile Advocate?
 
   @@map("users")
 }
@@ -202,6 +203,8 @@ model Advocate {
   verificationStatus     VerificationStatus @default(UNVERIFIED) @map("verification_status")
   verifiedAt             DateTime?          @map("verified_at")
   verifiedById           Int?               @map("verified_by_id")
+  // The login account a human advocate uses to reach their Advocate Desk (optional, one advocate per account).
+  userId                 Int?               @unique @map("user_id")
   acceptingConsultations Boolean            @default(false) @map("accepting_consultations")
   sortOrder              Int                @default(0) @map("sort_order")
   createdAt              DateTime           @default(now()) @map("created_at")
@@ -210,6 +213,7 @@ model Advocate {
   credentials AdvocateCredential[]
   aiConfig    AdvocateAiConfig?
   consultations Consultation[]
+  user          User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("advocates")
 }
@@ -258,6 +262,12 @@ enum ConsultationStatus {
   LIVE
   ENDED
   FAILED
+  // Requests to a human advocate
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
 }
 
 enum TurnSpeaker {
@@ -273,6 +283,8 @@ model Consultation {
   // never disappears; the advocate name is snapshotted for display.
   advocateId      Int?               @map("advocate_id")
   advocateName    String             @map("advocate_name")
+  // Snapshot, so history still knows whether it was an AI or a human call if the advocate is deleted.
+  advocateKind    AdvocateKind       @default(AI) @map("advocate_kind")
   state           String
   language        String
   status          ConsultationStatus @default(LOBBY)
@@ -287,6 +299,13 @@ model Consultation {
   usage           Json?
   summary         Json?
   summaryStatus   String             @default("NONE") @map("summary_status")
+  // Human consultations: what the client wrote, the request lifecycle, and the advocate's notes.
+  subject         String?
+  requestedAt     DateTime?          @map("requested_at")
+  respondedAt     DateTime?          @map("responded_at")
+  declineReason   String?            @map("decline_reason")
+  privateNotes    String?            @map("private_notes")
+  sharedNotes     String?            @map("shared_notes")
   createdAt       DateTime           @default(now()) @map("created_at")
 
   user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)

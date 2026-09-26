@@ -4,6 +4,8 @@ import type { Prisma } from "../../generated/prisma/client";
 const withDetails = {
   credentials: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
   aiConfig: true,
+  // The login account of a human advocate (admin only — never part of the public shape).
+  user: { select: { id: true, email: true, name: true } },
 } satisfies Prisma.AdvocateInclude;
 
 export const listAdvocates = (where: Prisma.AdvocateWhereInput = {}) =>
@@ -76,3 +78,16 @@ export const replaceAutoCredentials = (
     prisma.advocateCredential.deleteMany({ where: { advocateId, identifier: { startsWith: "auto:" } } }),
     prisma.advocateCredential.createMany({ data: rows.map((r) => ({ ...r, advocateId })) }),
   ]);
+
+// Accounts whose email matches (case-insensitively). More than one match is ambiguous and is refused by the caller.
+export const findUsersByEmail = (email: string) =>
+  prisma.user.findMany({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true, email: true, name: true },
+    take: 2,
+  });
+
+export const findAdvocateByUserId = (userId: number) => prisma.advocate.findUnique({ where: { userId } });
+
+export const setAccount = (advocateId: number, userId: number | null) =>
+  prisma.advocate.update({ where: { id: advocateId }, data: { userId } });

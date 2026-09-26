@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bot, Clock, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Bot, Clock, Loader2, Trash2, UserRound } from "lucide-react";
 import { toast } from "react-hot-toast";
 import PageShell from "../features/consultation/PageShell";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
@@ -16,6 +16,11 @@ const STATUS_LABEL: Record<string, string> = {
   LIVE: "In progress",
   ENDED: "Completed",
   FAILED: "Not completed",
+  REQUESTED: "Waiting for the advocate",
+  ACCEPTED: "Accepted",
+  DECLINED: "Declined",
+  EXPIRED: "Not answered",
+  CANCELLED: "Cancelled",
 };
 
 export default function ConsultationHistoryPage() {
@@ -93,11 +98,11 @@ export default function ConsultationHistoryPage() {
                 className="flex items-center gap-3 rounded-xl border border-cream-200 dark:border-white/10 bg-white dark:bg-navy-900 p-4"
               >
                 <button
-                  onClick={() => navigate(`/connect-advocate/session/${c.id}`)}
+                  onClick={() => navigate(c.advocateKind === "HUMAN" ? `/connect-advocate/human/${c.id}` : `/connect-advocate/session/${c.id}`)}
                   className="flex-1 min-w-0 flex items-center gap-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-500 rounded"
                 >
                   <span className="w-10 h-10 shrink-0 rounded-full border border-gold-500 bg-navy-950 text-gold-400 flex items-center justify-center">
-                    <Bot size={18} />
+                    {c.advocateKind === "HUMAN" ? <UserRound size={18} /> : <Bot size={18} />}
                   </span>
                   <span className="min-w-0">
                     <span className="block font-semibold text-[14.5px] truncate">{c.advocateName}</span>
@@ -114,7 +119,7 @@ export default function ConsultationHistoryPage() {
                 <button
                   onClick={() => setToDelete(c)}
                   aria-label={`Delete consultation with ${c.advocateName} on ${new Date(c.createdAt).toLocaleDateString()}`}
-                  disabled={c.status === "LIVE"}
+                  disabled={c.status === "LIVE" || c.status === "REQUESTED" || c.status === "ACCEPTED"}
                   className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-risk-high-fg dark:hover:text-risk-high-fg-dark hover:bg-risk-high-bg dark:hover:bg-risk-high-bg-dark disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-500"
                 >
                   <Trash2 size={16} />
