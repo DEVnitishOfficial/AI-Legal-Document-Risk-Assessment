@@ -48,8 +48,8 @@ export const getRagContext = async (query: string): Promise<string> => {
 
 // The model occasionally repeats the same source across a couple of
 // citation entries — dedupe by URL and cap so the UI never has to render a
-// runaway list.
-const dedupeCitations = (rawCitations: Citation[]): Citation[] => {
+// runaway list. Exported for direct unit testing.
+export const dedupeCitations = (rawCitations: Citation[]): Citation[] => {
     const seenUrls = new Set<string>();
     return rawCitations
         .filter((c) => (seenUrls.has(c.url) ? false : (seenUrls.add(c.url), true)))

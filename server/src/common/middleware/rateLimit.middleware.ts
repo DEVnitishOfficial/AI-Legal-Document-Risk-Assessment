@@ -8,7 +8,9 @@ import { AppError } from "../errors/AppError";
 // somehow unauthenticated; express-rate-limit v8 requires IPv6 addresses
 // (e.g. dev's "::1") to go through ipKeyGenerator so they're normalized
 // consistently rather than compared as raw strings.
-const keyByUser = (req: any) => (req.user?.id ? String(req.user.id) : ipKeyGenerator(req.ip));
+// Exported (not just used inline) so it can be unit tested directly instead
+// of only indirectly through a live rate-limit trip.
+export const keyByUser = (req: any) => (req.user?.id ? String(req.user.id) : ipKeyGenerator(req.ip));
 
 const handler = (req: any, res: any, next: any) => {
     next(new AppError("Too many requests — please slow down and try again shortly.", 429));
