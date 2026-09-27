@@ -16,6 +16,9 @@ export const env = {
   RAG_INGEST_SECRET: process.env.RAG_INGEST_SECRET!,
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
   SERVER_URL: process.env.SERVER_URL || "http://localhost:3000",
+  // Backs the BullMQ background job queue (document analysis) and the
+  // shared, restart-durable rate-limit store.
+  REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
   MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY || "",
   MSG91_TEMPLATE_ID: process.env.MSG91_TEMPLATE_ID || "",
   // Live voice consultations are billed per audio minute: each user gets this

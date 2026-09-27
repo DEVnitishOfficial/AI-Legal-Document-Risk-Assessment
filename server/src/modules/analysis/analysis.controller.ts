@@ -1,23 +1,21 @@
 import { Response, NextFunction } from "express";
-import { analyzeDocument } from "./analysis.service";
-import { createAnalysis, getDocumentById } from "./analysis.repository";
-import { markDocumentAnalyzed, markDocumentFailed } from "../document/document.repository";
-import { extractTextFromPDF } from "../../common/utils/pdf";
+import { getDocumentById } from "./analysis.repository";
+import { markDocumentProcessing } from "../document/document.repository";
+import { enqueueAnalysis } from "./analysis.queue";
 import { AppError } from "../../common/errors/AppError";
 
-const RISK_SCORE_BY_LEVEL: Record<string, number> = {
-    Low: 30,
-    Medium: 60,
-    High: 90,
-};
+// Re-exported for backward compatibility — the derivation itself now lives
+// in analysis.riskScore.ts (see that file for why).
+export { riskScoreForLevel } from "./analysis.riskScore";
 
-// Exported so this deterministic derivation can be unit tested directly
-// instead of only indirectly through a full analysis run.
-export const riskScoreForLevel = (level: string): number => RISK_SCORE_BY_LEVEL[level] ?? 60;
-
+// The actual analysis (text extraction, OCR fallback, the OpenAI call) runs
+// in the background via BullMQ (see analysis.worker.ts) — this handler's
+// job is just to report where things stand and, if nothing is in flight
+// yet, kick a job off. It is deliberately safe to call repeatedly: the
+// client polls this same endpoint while a document is "processing".
 export const runAnalysis = async (req: any, res: Response, next: NextFunction) => {
     try {
-        const { documentId } = req.body;
+        const { documentId, retry } = req.body;
 
         if (!documentId) {
             throw new AppError("documentId is required", 400);
@@ -34,7 +32,8 @@ export const runAnalysis = async (req: any, res: Response, next: NextFunction) =
         }
 
         // Already analyzed — return the stored result instead of spending
-        // another OpenAI call on a document we've already processed.
+        // another OpenAI call (or another background job) on a document
+        // we've already processed.
         if (doc.analysis) {
             return res.json({
                 success: true,
@@ -42,37 +41,30 @@ export const runAnalysis = async (req: any, res: Response, next: NextFunction) =
             });
         }
 
-        let text = "";
-
-        if (doc.filePath) {
-            text = await extractTextFromPDF(doc.filePath);
-        } else if (doc.content) {
-            text = doc.content;
-        } else {
-            throw new AppError("No valid content found in this document", 400);
+        // A job is already queued/running for this document — just report
+        // that, rather than enqueueing a second one (the queue itself also
+        // guards against this via a deterministic jobId, but checking here
+        // avoids the extra round trip).
+        if (doc.status === "processing") {
+            return res.status(202).json({ success: true, data: { status: "queued" } });
         }
 
-        try {
-            const aiResult = await analyzeDocument(text);
-
-            const saved = await createAnalysis(documentId, {
-                summary: aiResult.summary,
-                riskLevel: aiResult.riskLevel,
-                riskScore: riskScoreForLevel(aiResult.riskLevel),
-                clauses: aiResult.clauses,
-                riskItems: aiResult.riskItems,
-            });
-
-            await markDocumentAnalyzed(documentId, aiResult.title, aiResult.documentType);
-
-            res.json({
+        // A previous run failed for good (all retries exhausted). Only
+        // start a new attempt when the client explicitly asks for a retry
+        // (the first call of a fresh "analyze" click) — not on every poll,
+        // or a document that can never succeed would be silently
+        // re-attempted forever instead of surfacing the failure.
+        if (doc.status === "failed" && !retry) {
+            return res.json({
                 success: true,
-                data: { analysis: saved, cached: false },
+                data: { failed: true, message: "Analysis failed. Please try again." },
             });
-        } catch (aiError) {
-            await markDocumentFailed(documentId);
-            throw aiError;
         }
+
+        await markDocumentProcessing(documentId);
+        await enqueueAnalysis(documentId);
+
+        return res.status(202).json({ success: true, data: { status: "queued" } });
     } catch (err) {
         console.error("Error occurred while running analysis:", err);
         next(err);

@@ -75,3 +75,13 @@ export const markDocumentFailed = async (documentId: number) => {
     data: { status: "failed" },
   });
 };
+
+// Set right after a background analysis job is enqueued (before the worker
+// has necessarily picked it up), so a concurrent request/poll knows work is
+// already in flight and won't enqueue a second job for the same document.
+export const markDocumentProcessing = async (documentId: number) => {
+  return prisma.document.update({
+    where: { id: documentId },
+    data: { status: "processing" },
+  });
+};

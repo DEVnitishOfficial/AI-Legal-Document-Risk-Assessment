@@ -18,7 +18,8 @@
     "test:unit": "vitest run unit.test",
     "test:system": "vitest run system.test",
     "test:coverage": "vitest run --coverage",
-    "test:db:setup": "node scripts/setup-test-db.mjs"
+    "test:db:setup": "node scripts/setup-test-db.mjs",
+    "test:redis:flush": "node scripts/flush-test-redis.mjs"
   },
   "keywords": [],
   "author": "",
@@ -28,9 +29,11 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.3.9",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.2",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "node-cron": "^4.6.0",
@@ -39,8 +42,11 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdf-parse": "^1.1.1",
+    "pdf-to-img": "^7.0.0",
     "pg": "^8.20.0",
     "prisma": "^7.9.1",
+    "rate-limit-redis": "^6.0.1",
+    "tesseract.js": "^7.0.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {

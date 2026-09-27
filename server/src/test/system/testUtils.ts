@@ -50,3 +50,36 @@ export const registerAndLogin = async (label: string) => {
 export const cleanupUser = async (email: string) => {
   await prisma.user.deleteMany({ where: { email } });
 };
+
+/**
+ * Polls POST /analysis/run (the same endpoint the real client polls) until
+ * the background job finishes — either with a result or a reported
+ * failure — or the timeout elapses. Requires a real analysis worker to be
+ * running (see analysis.queue.system.test.ts) so the job actually gets
+ * processed; this alone does not start one.
+ */
+export const pollAnalysis = async (
+  token: string,
+  documentId: number,
+  { timeoutMs = 30000, intervalMs = 250 }: { timeoutMs?: number; intervalMs?: number } = {}
+) => {
+  const deadline = Date.now() + timeoutMs;
+  let last: any;
+
+  while (Date.now() < deadline) {
+    const res = await request(app)
+      .post("/api/v1/analysis/run")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentId });
+    last = res;
+
+    if (res.body?.data?.analysis || res.body?.data?.failed) {
+      return res;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error(
+    `pollAnalysis timed out after ${timeoutMs}ms waiting on document ${documentId}. Last response: ${JSON.stringify(last?.body)}`
+  );
+};
