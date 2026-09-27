@@ -12,7 +12,13 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:deploy": "prisma migrate deploy",
-    "rag:eval": "ts-node src/modules/rag/rag.eval.ts"
+    "rag:eval": "ts-node src/modules/rag/rag.eval.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run unit.test",
+    "test:system": "vitest run system.test",
+    "test:coverage": "vitest run --coverage",
+    "test:db:setup": "node scripts/setup-test-db.mjs"
   },
   "keywords": [],
   "author": "",
@@ -48,10 +54,14 @@
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.1",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^5.0.2",
     "dotenv": "^17.4.1",
+    "supertest": "^7.3.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^5.0.2"
   }
 }

@@ -11,6 +11,10 @@ const RISK_SCORE_BY_LEVEL: Record<string, number> = {
     High: 90,
 };
 
+// Exported so this deterministic derivation can be unit tested directly
+// instead of only indirectly through a full analysis run.
+export const riskScoreForLevel = (level: string): number => RISK_SCORE_BY_LEVEL[level] ?? 60;
+
 export const runAnalysis = async (req: any, res: Response, next: NextFunction) => {
     try {
         const { documentId } = req.body;
@@ -54,7 +58,7 @@ export const runAnalysis = async (req: any, res: Response, next: NextFunction) =
             const saved = await createAnalysis(documentId, {
                 summary: aiResult.summary,
                 riskLevel: aiResult.riskLevel,
-                riskScore: RISK_SCORE_BY_LEVEL[aiResult.riskLevel] ?? 60,
+                riskScore: riskScoreForLevel(aiResult.riskLevel),
                 clauses: aiResult.clauses,
                 riskItems: aiResult.riskItems,
             });
