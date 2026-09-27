@@ -20,20 +20,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// Shape/format validation (50-char minimum, title length, isFavorite being
+// a real boolean, "at least one field") now lives in document.schema.ts —
+// see document.schema.unit.test.ts — and is enforced at the route before
+// these functions ever run. What's left here is purely the business logic
+// a database round trip is needed for.
 describe("createTextDoc", () => {
-  it("rejects text under the 50-character minimum", async () => {
-    await expect(createTextDoc(1, "too short")).rejects.toMatchObject({ statusCode: 400 });
-    expect(mockedRepo.createTextDocument).not.toHaveBeenCalled();
-  });
-
-  it("rejects empty/whitespace-only content", async () => {
-    await expect(createTextDoc(1, "   ")).rejects.toMatchObject({ statusCode: 400 });
-    await expect(createTextDoc(1, undefined as unknown as string)).rejects.toMatchObject({
-      statusCode: 400,
-    });
-  });
-
-  it("accepts content at or above the minimum and caps the preview to 300 chars", async () => {
+  it("creates the document and caps the preview to 300 chars", async () => {
     const longText = "x".repeat(500);
     mockedRepo.createTextDocument.mockResolvedValue({ id: 1, content: longText } as any);
 
@@ -46,30 +39,6 @@ describe("createTextDoc", () => {
 
 describe("updateDocument (rename / favorite)", () => {
   const ownedDoc = { id: 10, userId: 1, title: "Old title" };
-
-  it("rejects an empty title", async () => {
-    mockedRepo.getDocumentById.mockResolvedValue(ownedDoc as any);
-    await expect(updateDocument(10, 1, { title: "   " })).rejects.toMatchObject({ statusCode: 400 });
-  });
-
-  it("rejects a title over 120 characters", async () => {
-    mockedRepo.getDocumentById.mockResolvedValue(ownedDoc as any);
-    await expect(updateDocument(10, 1, { title: "a".repeat(121) })).rejects.toMatchObject({
-      statusCode: 400,
-    });
-  });
-
-  it("rejects a non-boolean isFavorite", async () => {
-    mockedRepo.getDocumentById.mockResolvedValue(ownedDoc as any);
-    await expect(updateDocument(10, 1, { isFavorite: "yes" as any })).rejects.toMatchObject({
-      statusCode: 400,
-    });
-  });
-
-  it("rejects an update with neither field set", async () => {
-    mockedRepo.getDocumentById.mockResolvedValue(ownedDoc as any);
-    await expect(updateDocument(10, 1, {})).rejects.toMatchObject({ statusCode: 400 });
-  });
 
   it("rejects updating a document that belongs to someone else (IDOR guard)", async () => {
     mockedRepo.getDocumentById.mockResolvedValue({ id: 10, userId: 999 } as any);
@@ -90,10 +59,19 @@ describe("updateDocument (rename / favorite)", () => {
     mockedRepo.getDocumentById.mockResolvedValue(ownedDoc as any);
     mockedRepo.updateDocument.mockResolvedValue({ ...ownedDoc, title: "New title" } as any);
 
-    const result = await updateDocument(10, 1, { title: "  New title  " });
+    const result = await updateDocument(10, 1, { title: "New title" });
 
     expect(mockedRepo.updateDocument).toHaveBeenCalledWith(10, { title: "New title" });
     expect(result.title).toBe("New title");
+  });
+
+  it("passes a favorite toggle straight through for the owning user", async () => {
+    mockedRepo.getDocumentById.mockResolvedValue(ownedDoc as any);
+    mockedRepo.updateDocument.mockResolvedValue({ ...ownedDoc, isFavorite: true } as any);
+
+    await updateDocument(10, 1, { isFavorite: true });
+
+    expect(mockedRepo.updateDocument).toHaveBeenCalledWith(10, { isFavorite: true });
   });
 });
 

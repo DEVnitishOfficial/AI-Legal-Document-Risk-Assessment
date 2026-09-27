@@ -73,6 +73,20 @@ describe("Document analysis system flow (real BullMQ queue + worker + Redis + Po
     expect(res.status).toBe(400);
   });
 
+  it("rejects a non-numeric or non-positive documentId (analysis.schema.ts)", async () => {
+    const notANumber = await request(app)
+      .post("/api/v1/analysis/run")
+      .set("Authorization", `Bearer ${userA.token}`)
+      .send({ documentId: "not-a-number" });
+    expect(notANumber.status).toBe(400);
+
+    const negative = await request(app)
+      .post("/api/v1/analysis/run")
+      .set("Authorization", `Bearer ${userA.token}`)
+      .send({ documentId: -1 });
+    expect(negative.status).toBe(400);
+  });
+
   it("rejects analyzing a document that does not exist", async () => {
     const res = await request(app)
       .post("/api/v1/analysis/run")

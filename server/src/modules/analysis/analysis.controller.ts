@@ -8,6 +8,9 @@ import { AppError } from "../../common/errors/AppError";
 // in analysis.riskScore.ts (see that file for why).
 export { riskScoreForLevel } from "./analysis.riskScore";
 
+// documentId's shape (present, a positive integer) is guaranteed by
+// analysis.schema.ts's runAnalysisBodySchema at the route.
+//
 // The actual analysis (text extraction, OCR fallback, the OpenAI call) runs
 // in the background via BullMQ (see analysis.worker.ts) — this handler's
 // job is just to report where things stand and, if nothing is in flight
@@ -16,11 +19,6 @@ export { riskScoreForLevel } from "./analysis.riskScore";
 export const runAnalysis = async (req: any, res: Response, next: NextFunction) => {
     try {
         const { documentId, retry } = req.body;
-
-        if (!documentId) {
-            throw new AppError("documentId is required", 400);
-        }
-
         const doc = await getDocumentById(documentId);
 
         if (!doc) {

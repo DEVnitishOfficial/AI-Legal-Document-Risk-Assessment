@@ -21,3 +21,17 @@ if (!process.env.DATABASE_URL?.includes("_test")) {
       "tests — see server/.env.test.example."
   );
 }
+
+if (process.env.MSG91_AUTH_KEY || process.env.MSG91_TEMPLATE_ID) {
+  // Real near-miss during development: .env.test originally didn't set
+  // these at all, so env.ts's own fallback dotenv.config() call picked up
+  // the *real* MSG91 credentials from server/.env, and otp.system.test.ts
+  // genuinely called the live MSG91 API. .env.test must set both to an
+  // empty string (not omit them) to keep otp.service.ts's isDevMode path
+  // active — see the comment there.
+  throw new Error(
+    "server/.env.test has MSG91_AUTH_KEY/MSG91_TEMPLATE_ID set (or they " +
+      "leaked in from server/.env). Refusing to run tests — a real OTP " +
+      "test would send a live SMS. Set both to an empty string in .env.test."
+  );
+}

@@ -24,18 +24,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// documentId's presence/shape is validated at the route (analysis.schema.ts
+// + validate.middleware.ts, see analysis.schema.unit.test.ts and the
+// analysis system tests) before this controller ever runs — these tests
+// start from a request that has already passed that gate.
 describe("runAnalysis controller", () => {
-  it("400s when documentId is missing", async () => {
-    const req: any = { body: {}, user: { id: 1 } };
-    const res = makeRes();
-    const next = vi.fn();
-
-    await runAnalysis(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
-    expect(mockedGetDoc).not.toHaveBeenCalled();
-  });
-
   it("404s when the document does not exist", async () => {
     mockedGetDoc.mockResolvedValue(null as any);
     const req: any = { body: { documentId: 1 }, user: { id: 1 } };

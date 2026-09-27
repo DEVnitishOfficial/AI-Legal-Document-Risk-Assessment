@@ -47,7 +47,8 @@
     "prisma": "^7.9.1",
     "rate-limit-redis": "^6.0.1",
     "tesseract.js": "^7.0.0",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
