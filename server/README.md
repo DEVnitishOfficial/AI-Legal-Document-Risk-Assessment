@@ -1536,3 +1536,35 @@ This phase moves the actual analysis work to a **background job queue** (BullMQ,
 * **Real, live run**: registered a real account, pasted a lease → the document card correctly showed "Analyzing…" (not blocked) while a real OpenAI call ran in the background → a real 90/100 High-risk report rendered a few seconds later. Separately, **uploaded a photographed eviction notice** (PNG, no PDF/text layer at all) → OCR extracted the text in the background → the real AI analysis correctly summarized *"The tenant must leave the property within 24 hours..."* — genuinely reading content that only existed as pixels.
 
 ---
+
+# ✅ Input Validation Layer (Phase 26)
+
+---
+
+## 📌 Overview
+
+Every route validated its input by hand, if at all — some checked shape/type (`if (!documentId) throw ...`), several checked nothing (registration never checked the password was even a string of reasonable length; several `:id` params were `Number(req.params.id)` with no guard, so a non-numeric id became `NaN` and reached Prisma unguarded — an unhandled Prisma validation error, i.e. a raw 500, not a clean 400). This phase introduces `zod` as a standard, single-place validation layer and applies it to the highest-traffic, previously weakest-covered routes: auth, OTP, documents, analysis, and the Legal Assistant chat's core endpoints.
+
+**Deliberately out of scope**: `advocate.service.ts` (already has its own reasonably thorough hand-rolled validation helpers — `reqString`/`optString`/`oneOf`/etc. in `advocate.validation.ts`) and `consultation.service.ts`/`human.service.ts` (already validate state/language against data-driven allowlists and do real business checks like advocate availability). Migrating already-working, already-tested validation to `zod` is a separate, lower-value cleanup — not a new gap — and wasn't done here to keep this change focused and low-risk.
+
+---
+
+## 🔑 What changed
+
+* **`common/middleware/validate.middleware.ts`** — `validate({body?, params?, query?})`: parses each target against its zod schema, replaces `req.body`/`params`/`query` with the *parsed* value (so a schema's `.trim()`/`.default()`/`z.coerce` are what the controller actually sees), and turns any `ZodError` into a `400 AppError` naming the first failing field (`"password: Password must be at least 8 characters"`) — the same friendly-error discipline this codebase already applies everywhere else.
+* **`common/schemas/common.schema.ts`** — `idParamSchema(name?)`, reused by every `:id`-shaped route, and `phoneSchema` (the same `^\+?[1-9]\d{7,14}$` pattern OTP already used, now the single source of truth for it and for registration's optional phone field).
+* **New `*.schema.ts` per module**: `user` (register/login), `otp` (send/verify), `document` (paste-text/rename+favorite), `analysis` (run), `legal-agent` (create/update conversation, send message, attach document).
+* **Format checks moved out of services/controllers, business checks stayed**: e.g. `document.service.ts::createTextDoc` no longer checks the 50-character minimum itself (the route does); it still does the ownership/existence checks that need the database. Applied consistently across all five modules above — a controller or service function now only contains logic a schema genuinely can't express.
+* **One real, deliberate behavior change**: `legal-agent`'s conversation `language` used to silently coerce anything that wasn't exactly `"hi"` to `"en"` (`language === "hi" ? "hi" : "en"`) — a typo or a stale client sending `"fr"` was swallowed, not reported. It's now a `400` if the value is present but not `"en"`/`"hi"`, same as everywhere else bad input is handled; omitting the field still defaults to `"en"`.
+* **Closed a real NaN → 500 gap**: `document.controller.ts::getDocumentByIdHandler`/`getDocumentFileHandler` and three `legal-agent` handlers read `Number(req.params.id)` with no guard before this phase — a non-numeric id reached Prisma directly. Now caught as a clean `400` by `idParamSchema` before the handler ever runs.
+
+---
+
+## ✅ Result (verified two ways: automated tests, and real HTTP calls against the live dev server)
+
+* **Automated**: 213/213 server tests (up from 114) — new unit tests for the validate middleware itself, `idParamSchema`/`phoneSchema`, and every new `*.schema.ts`; new/extended system tests proving real `400`s for malformed email/password/phone/documentId/title, the non-numeric-`:id` → `400` fix, and (a genuine behavior change) the unrecognized-`language` rejection — all against the real app and a real test database.
+* **A real bug caught by the system tests, before it shipped**: `server/.env.test` didn't set `MSG91_AUTH_KEY`/`MSG91_TEMPLATE_ID` at all, so `env.ts`'s own fallback `dotenv.config()` call filled them in from the **real** `server/.env` — the first OTP system test run genuinely called the live MSG91 API with a real (synthetic-but-valid-looking) phone number instead of hitting the dev-mode logging path. Fixed by setting both to an explicit empty string in `.env.test` (dotenv only skips variables that are already *present*, not falsy ones — omitting them is not the same as blanking them) and added a hard startup guard in `src/test/setupEnv.ts` that refuses to run any test at all if either key is non-empty.
+* **Live, real HTTP calls against the running dev server**: a malformed-email registration and a missing-password login both now return a clean `400` with the exact field named, instead of either succeeding wrongly or surfacing a generic error.
+* **Live, real browser run**: registered through the actual form, logged in, pasted a lease and got a real analysis report, and sent a real message in the Legal Assistant — confirming the new validation layer doesn't reject anything the real client actually sends.
+
+---

@@ -25,7 +25,13 @@ Uses [Vitest](https://vitest.dev). Two kinds of tests live side by side, told ap
    accidentally wiping real data. The default `REDIS_URL` in the example
    file points at logical DB index 1 (your dev queue normally runs on index
    0 of the same local Redis) — leave it as-is unless you have a reason not
-   to.
+   to. **Leave `MSG91_AUTH_KEY`/`MSG91_TEMPLATE_ID` as empty strings** —
+   don't delete the lines. `env.ts`'s own fallback `dotenv.config()` call
+   fills in anything `.env.test` doesn't set from your real `server/.env`,
+   and this genuinely happened once during development: the OTP system
+   test called the live MSG91 API with real prod credentials because these
+   two lines were simply missing. `setupEnv.ts` now refuses to run any
+   test at all if either key comes out non-empty.
 2. Create and migrate that test database:
    ```bash
    npm run test:db:setup
@@ -67,6 +73,11 @@ interfering with each other.
   the truly final attempt or an unrecoverable error), the queue's
   per-document job-dedup, and the `/analysis/run` controller's branching
   (cached / already-processing / failed-without-retry / start-new-job).
+  Also: the generic `validate` middleware itself (parses & replaces
+  body/params/query, formats the first Zod issue into a friendly `400`),
+  `idParamSchema`/`phoneSchema`, and every `*.schema.ts` (user, otp,
+  document, analysis, legal-agent) — the actual accept/reject rules for
+  every field on every newly-validated route.
 - **System**: register → login → protected-route flow; document
   create/read/rename/delete; the **IDOR ownership guard** on documents and
   on analysis (a real historical bug in this codebase — one user could
@@ -97,12 +108,24 @@ interfering with each other.
   deliberate trade-off for proving the retry behavior actually works, not
   just that the code compiles around the right shape.
 
+  Also: a full OTP send → wrong-code → resend-cooldown → verify → account
+  creation flow (`otp.system.test.ts`, real HTTP calls, no mocking needed —
+  dev mode logs instead of calling the real SMS API); input-validation
+  `400`s across auth, documents, analysis and the Legal Assistant's
+  non-AI-calling endpoints (conversation create/rename/attach — proven
+  against the real routes; malformed input never reaches user.service.ts,
+  document.service.ts, etc., and a non-numeric `:id` that used to reach
+  Prisma unguarded now gets a clean `400`).
+
 ## Known gaps (not covered yet)
 
-The Legal Assistant chat (SSE streaming), voice transcription, and Connect
-Advocate (WebRTC/Realtime) flows are not system-tested yet — they need
-heavier mocking (streaming responses, OpenAI Realtime, WebSocket
-signalling) that didn't fit this pass. Worth a follow-up branch.
+The Legal Assistant's AI-calling endpoints (`sendMessage`'s actual
+streamed answer, voice transcription) and Connect Advocate
+(WebRTC/Realtime) are not system-tested yet — they need heavier mocking
+(streaming responses, OpenAI Realtime, WebSocket signalling) that didn't
+fit this pass. The *validation* on `sendMessage` (rejecting empty content
+before any AI call happens) is covered; the success path isn't. Worth a
+follow-up branch.
 
 OCR itself (`tesseract.js` actually recognizing text, `pdf-to-img`
 actually rasterizing a PDF page) is **not exercised by the automated

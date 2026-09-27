@@ -77,3 +77,48 @@ describe("Auth system flow", () => {
     expect(res.body.user).not.toHaveProperty("password");
   });
 });
+
+// The input-validation layer (user.schema.ts) sits in front of
+// user.service.ts's business checks — a malformed request is now a plain
+// 400 naming the problem, caught before it ever reaches the database,
+// distinct from the 404/409 business-rule responses tested above.
+describe("Auth input validation", () => {
+  it("400s a malformed email on registration — distinct from a 404/business error", async () => {
+    const res = await request(app)
+      .post("/api/v1/users/register")
+      .send({ name: "Bad Email", email: "not-an-email", password: TEST_PASSWORD });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message.toLowerCase()).toContain("email");
+  });
+
+  it("400s a too-short password on registration, without creating an account", async () => {
+    const email = uniqueEmail("short-password");
+    const res = await request(app)
+      .post("/api/v1/users/register")
+      .send({ name: "Short Password", email, password: "short1" });
+
+    expect(res.status).toBe(400);
+
+    // Confirm no account was actually created despite the short password.
+    const login = await request(app).post("/api/v1/users/login").send({ email, password: "short1" });
+    expect(login.status).toBe(404);
+  });
+
+  it("400s a missing name on registration", async () => {
+    const res = await request(app)
+      .post("/api/v1/users/register")
+      .send({ email: uniqueEmail("no-name"), password: TEST_PASSWORD });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a malformed email on login — distinct from the 404 'not found' response", async () => {
+    const res = await request(app).post("/api/v1/users/login").send({ email: "nope", password: "whatever" });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a missing password on login", async () => {
+    const res = await request(app).post("/api/v1/users/login").send({ email: "a@b.com" });
+    expect(res.status).toBe(400);
+  });
+});

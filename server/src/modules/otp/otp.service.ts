@@ -12,13 +12,10 @@ const RESEND_COOLDOWN_MS = 30 * 1000;
 const OTP_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
-
+// Phone format is validated at the route (otp.schema.ts, shared with
+// registration) before this ever runs — only the business rules
+// (cooldown, expiry, attempt limits) belong here.
 export const sendOtp = async (phone: string) => {
-  if (!phone || !PHONE_REGEX.test(phone)) {
-    throw new AppError("Enter a valid mobile number", 400);
-  }
-
   const latest = await otpRepo.findLatestOtpForPhone(phone);
   if (latest && Date.now() - latest.lastSentAt.getTime() < RESEND_COOLDOWN_MS) {
     throw new AppError("A code was sent recently. Please wait a moment before requesting another.", 429);
@@ -36,10 +33,6 @@ export const sendOtp = async (phone: string) => {
 };
 
 export const verifyOtp = async (phone: string, code: string) => {
-  if (!phone || !code) {
-    throw new AppError("Phone and OTP code are required", 400);
-  }
-
   const otp = await otpRepo.findLatestOtpForPhone(phone);
   if (!otp) {
     throw new AppError("This code was already used, or no code was requested for this number. Please request a new one.", 400);

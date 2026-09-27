@@ -42,8 +42,6 @@ const getOwnedConversation = async (conversationId: number, userId?: number) => 
     return conversation;
 };
 
-const MAX_TITLE_LENGTH = 120;
-
 // Same 404/403 checks as getOwnedConversation, without loading the messages.
 const getOwnedConversationOwner = async (conversationId: number, userId?: number) => {
     if (!Number.isInteger(conversationId)) {
@@ -134,8 +132,9 @@ const processUserMessage = async (
 
 export const createConversationHandler = async (req: any, res: Response, next: NextFunction) => {
     try {
-        const language = req.body?.language === "hi" ? "hi" : "en";
-        const conversation = await createConversation(req.user?.id, language);
+        // req.body.language is already "en"/"hi" (or defaulted to "en") —
+        // see legal-agent.schema.ts's createConversationBodySchema.
+        const conversation = await createConversation(req.user?.id, req.body.language);
 
         res.status(201).json({ success: true, data: { conversation } });
     } catch (err) {
@@ -163,32 +162,13 @@ export const getConversationHandler = async (req: any, res: Response, next: Next
     }
 };
 
+// language/title's shape (a real "en"/"hi", a non-empty title within the
+// length limit, at least one field present) is guaranteed by
+// legal-agent.schema.ts's updateConversationBodySchema at the route.
 export const updateConversationHandler = async (req: any, res: Response, next: NextFunction) => {
     try {
         const conversationId = Number(req.params.id);
-        const { language, title } = req.body ?? {};
-        const data: { title?: string; language?: string; updatedAt?: Date } = {};
-
-        if (language !== undefined) {
-            if (language !== "en" && language !== "hi") {
-                throw new AppError("language must be 'en' or 'hi'", 400);
-            }
-            data.language = language;
-        }
-
-        if (title !== undefined) {
-            if (typeof title !== "string" || !title.trim()) {
-                throw new AppError("Title cannot be empty", 400);
-            }
-            if (title.trim().length > MAX_TITLE_LENGTH) {
-                throw new AppError(`Title must be ${MAX_TITLE_LENGTH} characters or fewer`, 400);
-            }
-            data.title = title.trim();
-        }
-
-        if (Object.keys(data).length === 0) {
-            throw new AppError("Nothing to update — send a title or language", 400);
-        }
+        const data: { title?: string; language?: string; updatedAt?: Date } = { ...req.body };
 
         const owner = await getOwnedConversationOwner(conversationId, req.user?.id);
 
@@ -218,17 +198,15 @@ export const deleteConversationHandler = async (req: any, res: Response, next: N
     }
 };
 
+// documentId's shape is guaranteed by legal-agent.schema.ts's
+// attachDocumentBodySchema at the route.
 export const attachDocumentHandler = async (req: any, res: Response, next: NextFunction) => {
     try {
         const conversationId = Number(req.params.id);
         const { documentId } = req.body;
 
-        if (!documentId) {
-            throw new AppError("documentId is required", 400);
-        }
-
         await getOwnedConversation(conversationId, req.user?.id);
-        const link = await linkDocumentToConversation(conversationId, Number(documentId));
+        const link = await linkDocumentToConversation(conversationId, documentId);
 
         res.status(201).json({ success: true, data: { link } });
     } catch (err) {
@@ -245,11 +223,9 @@ export const sendMessageHandler = async (req: any, res: Response, next: NextFunc
 
     try {
         const conversationId = Number(req.params.id);
+        // content's shape is guaranteed by legal-agent.schema.ts's
+        // sendMessageBodySchema at the route.
         const { content } = req.body;
-
-        if (!content || typeof content !== "string" || !content.trim()) {
-            throw new AppError("content is required", 400);
-        }
 
         const conversation = await getOwnedConversation(conversationId, req.user?.id);
         const language = conversation.language === "hi" ? "hi" : "en";

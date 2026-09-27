@@ -143,3 +143,72 @@ circumstances. The Tenant waives all rights to approach any court of law.`;
     expect(listB.body.data.some((d: any) => d.id === ownDocId)).toBe(false);
   });
 });
+
+// document.schema.ts + common.schema.ts's idParamSchema, exercised against
+// the real routes. Before the params validator existed, a non-numeric :id
+// became NaN and reached Prisma unguarded on the GET routes — an unhandled
+// Prisma validation error (a raw 500), not a clean 400.
+describe("Document input validation", () => {
+  let user: Awaited<ReturnType<typeof registerAndLogin>>;
+  let docId: number;
+
+  beforeAll(async () => {
+    user = await registerAndLogin("docs-validation");
+    const create = await request(app)
+      .post("/api/v1/documents/text")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ content: "x".repeat(60) });
+    docId = create.body.data.document.id;
+  });
+
+  afterAll(async () => {
+    await cleanupUser(user.email);
+  });
+
+  it("400s a non-numeric :id on GET instead of a raw 500", async () => {
+    const res = await request(app)
+      .get("/api/v1/documents/not-a-number")
+      .set("Authorization", `Bearer ${user.token}`);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a non-numeric :id on PATCH", async () => {
+    const res = await request(app)
+      .patch("/api/v1/documents/not-a-number")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "New title" });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a non-numeric :id on DELETE", async () => {
+    const res = await request(app)
+      .delete("/api/v1/documents/not-a-number")
+      .set("Authorization", `Bearer ${user.token}`);
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a non-boolean isFavorite", async () => {
+    const res = await request(app)
+      .patch(`/api/v1/documents/${docId}`)
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ isFavorite: "yes" });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s an update with neither title nor isFavorite", async () => {
+    const res = await request(app)
+      .patch(`/api/v1/documents/${docId}`)
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts a valid isFavorite toggle", async () => {
+    const res = await request(app)
+      .patch(`/api/v1/documents/${docId}`)
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ isFavorite: true });
+    expect(res.status).toBe(200);
+    expect(res.body.data.document.isFavorite).toBe(true);
+  });
+});
