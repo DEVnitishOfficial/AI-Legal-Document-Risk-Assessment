@@ -1503,3 +1503,36 @@ Verified through the browser suite in the client README (real `404`, `401` and `
 **To pick this up:** restart the API — it runs as plain `ts-node` (no auto-reload), so a process started before this change still returns the old wording.
 
 ---
+
+# ⚙️ Background Analysis Queue (Redis + BullMQ) and OCR (Phase 25)
+
+---
+
+## 📌 Overview
+
+Document analysis used to run **inline**, inside the `POST /analysis/run` request: extract text → call OpenAI (~5–10s) → write the result → respond. A burst of simultaneous "Analyze" clicks meant a burst of simultaneous OpenAI calls with no cap, a transient OpenAI hiccup failed the whole request with no retry, and the rate limiter's in-memory store reset on every `nodemon` restart. Separately, a scanned or photographed document (no PDF text layer) produced empty/garbage text and either a rejection or a near-meaningless summary — `pdf-parse` was the only extraction path.
+
+This phase moves the actual analysis work to a **background job queue** (BullMQ, backed by Redis) with automatic retries, and adds an **OCR fallback** (`tesseract.js` + `pdf-to-img`) for scanned PDFs and photographed documents. Also closes the gap between the approved project proposal (which named Redis, BullMQ and OCR) and what the code actually used.
+
+---
+
+## 🔑 What changed
+
+* **`docker-compose.yml`** — added a `redis` service (`redis:7-alpine`, AOF persistence) alongside Postgres.
+* **`config/redis.ts`** — one shared `ioredis` connection (`maxRetriesPerRequest: null`, BullMQ's own requirement), reused by the queue, the worker and the rate limiter.
+* **`modules/analysis/analysis.queue.ts`** — a BullMQ `Queue` (`document-analysis`), 3 attempts with exponential backoff, a **deterministic per-document `jobId`** so a duplicate enqueue for the same document can't run twice.
+* **`modules/analysis/analysis.worker.ts`** — the actual work (text extraction, the OpenAI call, saving the result), concurrency capped at 3. `processAnalysisJob` is the pure logic (unit-testable on its own); `analysisJobProcessor` wraps it with the retry/failure bookkeeping — a document is only flipped to `failed` once nothing more will be retried (an `UnrecoverableError`, or the last configured attempt), not on every transient retry in between. **Gotcha hit and fixed**: `job.attemptsMade` counts attempts completed *before* the current one (0, 1, 2 for a 3-attempt job) — not documented clearly anywhere, and an off-by-one here meant a permanently-failing job never actually got marked `failed` in the database. Only caught by a real end-to-end system test driving a genuine BullMQ retry/backoff cycle; a hand-mocked unit test's fake job object had accidentally encoded the same wrong assumption and passed anyway.
+* **`analysis.controller.ts::runAnalysis`** rewritten around the queue: checks ownership (unchanged, still instant/synchronous), returns the cached analysis immediately if one exists, reports `{status:"queued"}` (202) if a job is already processing, and otherwise marks the document `processing` and enqueues. A **`retry` flag** distinguishes "the client's first poll of a fresh click" from "just checking status" — only the former restarts a previously-`failed` document, so a document that can never succeed is reported once, not silently re-attempted forever by the client's own polling.
+* **`common/utils/ocr.ts`** + **`modules/analysis/analysis.textExtraction.ts`** — `extractDocumentText` tries the fast path first (pasted content as-is; a PDF's text layer via `pdf-parse`) and only falls back to OCR when there isn't enough real text (same 50-char minimum used elsewhere): `ocrPdf` rasterizes up to 5 pages (`pdf-to-img`) and reads each with `tesseract.js`; `ocrImage` reads a directly-uploaded `.jpg`/`.png` the same way.
+* **Real bug found and fixed along the way**: `document.service.ts::uploadDocument` called `pdf-parse` unconditionally on *every* uploaded file, for a "preview" field the client never actually read. It worked only because the client had only ever offered PDFs; the moment image uploads were enabled (this phase), any photo upload 500'd. Removed the dead preview entirely — real extraction (extension-aware, with the OCR fallback) already happens in the background job.
+* **`rateLimit.middleware.ts`** — now backed by `RedisStore` (durable across restarts; a real gap noted from earlier sessions), one store instance per limiter (sharing one would merge separately-tracked limits). New **`analysisPollRateLimiter`** (300/15min) replaces `aiRateLimiter` (30/15min) on `/analysis/run`: that route is now polled repeatedly while a background job runs, and most of those calls spend no OpenAI cost at all (the queue's job-dedup already prevents a duplicate AI call) — the old AI-spend-sized limit was hit purely by polling volume on a single slow (OCR'd) document before this fix.
+* **`server.ts`** — starts/stops the worker alongside the other background tasks (RAG scheduler, consultation recovery, etc.) in the same process; no separate deployment needed at this scale.
+
+---
+
+## ✅ Result (verified two ways: automated tests, and a real headless-Chromium run against the live dev server with a real OpenAI call)
+
+* **Automated**: 8 new system tests drive the real HTTP contract against a real BullMQ queue, a real worker, real Redis and real Postgres (OpenAI mocked) — enqueue → poll → complete; the IDOR guard still rejects instantly without enqueueing; two concurrent requests for the same fresh document only run the AI once (the job-dedup); a genuinely retried transient failure eventually succeeds; a permanently-failing document is reported as `failed` after exactly 3 attempts and is *not* silently re-enqueued by a later poll. Plus unit tests for the OCR-routing decision, the worker's pure logic, the retry/failure bookkeeping, and the queue's job-dedup.
+* **Real, live run**: registered a real account, pasted a lease → the document card correctly showed "Analyzing…" (not blocked) while a real OpenAI call ran in the background → a real 90/100 High-risk report rendered a few seconds later. Separately, **uploaded a photographed eviction notice** (PNG, no PDF/text layer at all) → OCR extracted the text in the background → the real AI analysis correctly summarized *"The tenant must leave the property within 24 hours..."* — genuinely reading content that only existed as pixels.
+
+---

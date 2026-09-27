@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { riskScoreForLevel } from "./analysis.controller";
+import { riskScoreForLevel } from "./analysis.riskScore";
 
 describe("riskScoreForLevel", () => {
   it("maps Low to 30", () => {

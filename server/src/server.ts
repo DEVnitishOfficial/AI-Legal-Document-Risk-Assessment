@@ -6,6 +6,7 @@ import { ensureDefaultAiAdvocate } from "./modules/advocate/advocate.service";
 import { recoverStaleSessions, shutdownAll } from "./modules/consultation/consultation.realtime";
 import { attachHub } from "./modules/human/human.hub";
 import { startSweeper } from "./modules/human/human.service";
+import { startAnalysisWorker, shutdownAnalysisWorker } from "./modules/analysis/analysis.worker";
 
 const PORT = env.PORT;
 
@@ -22,12 +23,18 @@ const server = app.listen(PORT, () => {
 
   // Live calls with real advocates: the realtime hub (WebSocket on this port) and the timeout sweeper.
   startSweeper();
+
+  // Document analysis (text extraction incl. OCR fallback, the OpenAI call)
+  // runs in the background via BullMQ — this process both serves the API
+  // and consumes the queue, which is all one deployment needs at this scale.
+  startAnalysisWorker();
 });
 attachHub(server);
 
-// End live calls cleanly on a normal shutdown; a crash is covered by the recovery above.
+// End live calls / stop taking new analysis jobs cleanly on a normal
+// shutdown; a crash is covered by the recovery above.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
-    shutdownAll().finally(() => process.exit(0));
+    Promise.all([shutdownAll(), shutdownAnalysisWorker()]).finally(() => process.exit(0));
   });
 }

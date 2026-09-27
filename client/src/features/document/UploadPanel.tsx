@@ -91,6 +91,7 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
         >
           <input
             type="file"
+            accept="application/pdf,image/png,image/jpeg"
             className="hidden"
             disabled={loading || disabled}
             onChange={(e) => {
@@ -108,7 +109,9 @@ export default function UploadPanel({ onUploaded, disabled }: UploadPanelProps) 
             <>
               <UploadCloud size={20} className="text-gray-400 dark:text-cream-100/40" />
               <span className="text-[13px] font-semibold">Drop a file, or click to browse</span>
-              <span className="text-[11.5px] text-gray-400 dark:text-cream-100/40">PDF, up to 10MB</span>
+              <span className="text-[11.5px] text-gray-400 dark:text-cream-100/40">
+                PDF or photo (JPG/PNG) — up to 10MB. Scanned pages are read automatically.
+              </span>
             </>
           )}
         </label>

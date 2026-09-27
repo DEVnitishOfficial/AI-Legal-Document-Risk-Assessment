@@ -7,12 +7,11 @@ vi.mock("./document.repository", () => ({
   createTextDocument: vi.fn(),
   createDocument: vi.fn(),
 }));
-vi.mock("../../common/utils/pdf", () => ({ extractTextFromPDF: vi.fn() }));
 vi.mock("../../common/utils/files", () => ({ removeUploadedFile: vi.fn() }));
 
 import * as docRepo from "./document.repository";
 import { removeUploadedFile } from "../../common/utils/files";
-import { createTextDoc, updateDocument, deleteDocument } from "./document.service";
+import { createTextDoc, updateDocument, deleteDocument, uploadDocument } from "./document.service";
 
 const mockedRepo = vi.mocked(docRepo);
 const mockedRemoveFile = vi.mocked(removeUploadedFile);
@@ -116,5 +115,21 @@ describe("deleteDocument", () => {
 
     expect(mockedRepo.deleteDocument).toHaveBeenCalledWith(10);
     expect(mockedRemoveFile).toHaveBeenCalledWith("uploads/some-file.pdf");
+  });
+});
+
+describe("uploadDocument", () => {
+  it("just saves the document row, for any file type — no eager text extraction", async () => {
+    // Regression test: this used to call pdf-parse unconditionally on the
+    // uploaded file (for an unread "preview" field), which threw on any
+    // non-PDF file — a real 500 surfaced once image uploads were added.
+    // Real text extraction (extension-aware, with OCR fallback) now only
+    // happens in the background analysis job (analysis.textExtraction.ts).
+    mockedRepo.createDocument.mockResolvedValue({ id: 1, userId: 1, filePath: "uploads/photo.png" } as any);
+
+    const result = await uploadDocument(1, "uploads/photo.png");
+
+    expect(mockedRepo.createDocument).toHaveBeenCalledWith(1, "uploads/photo.png");
+    expect(result).toEqual({ document: { id: 1, userId: 1, filePath: "uploads/photo.png" } });
   });
 });

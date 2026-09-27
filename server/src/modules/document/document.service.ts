@@ -1,5 +1,4 @@
 import * as docRepo from "./document.repository";
-import { extractTextFromPDF } from "../../common/utils/pdf";
 import { AppError } from "../../common/errors/AppError";
 import { removeUploadedFile } from "../../common/utils/files";
 
@@ -61,16 +60,14 @@ export const deleteDocument = async (documentId: number, userId: number) => {
 };
 
 export const uploadDocument = async (userId: number, filePath: string) => {
-  // Save document in DB
+  // Text is deliberately NOT extracted here: it used to call pdf-parse
+  // unconditionally (breaking on any non-PDF upload — a real bug this
+  // surfaced once image uploads were added), the resulting preview was
+  // never actually read by the client, and it duplicated work that
+  // analysis.textExtraction.ts already does properly (extension-aware,
+  // with OCR fallback) when the background analysis job runs.
   const document = await docRepo.createDocument(userId, filePath);
-
-  // Extract text (for future AI use)
-  const text = await extractTextFromPDF(filePath);
-
-  return {
-    document,
-    extractedText: text.substring(0, 500), // preview only
-  };
+  return { document };
 };
 
 export const createTextDoc = async (userId: number, content: string) => {

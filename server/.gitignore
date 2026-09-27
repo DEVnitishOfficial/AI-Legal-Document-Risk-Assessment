@@ -6,3 +6,7 @@ dist
 /src/generated/prisma
 /uploads
 /coverage
+
+# tesseract.js downloads its OCR language data here on first use and
+# caches it locally — regenerated automatically, never committed.
+*.traineddata

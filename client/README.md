@@ -820,3 +820,29 @@ The screenshot case (unregistered email → plain message, email outlined, "Crea
 **Known limits:** the streaming chat still reports a failed answer as a toast (it is a background stream, not a form); the unused `pages/DocumentList.tsx` still has an old type error.
 
 ---
+
+# ⏳ Background Analysis: Polling Instead of Waiting (Phase 15)
+
+---
+
+## 📌 Overview
+
+The server now runs document analysis as a background job (server README, Phase 25) instead of inside the request — `POST /analysis/run` answers immediately with `{status:"queued"}` rather than the finished result. `useDocumentAnalysis.ts` was rewritten to poll instead of awaiting a single response.
+
+---
+
+## 🔑 What changed
+
+* **`useDocumentAnalysis.ts`** — `runAnalysis` now loops: post → if the analysis is back, show it; if the server reports `failed`, toast and stop (no automatic re-attempt); otherwise wait ~2s and ask again, for up to ~4 minutes (enough to cover OCR on a slow scanned document). Only the first call of a run passes `retry: true` — later poll iterations don't, so a document that can never succeed is reported once instead of the client's own polling silently re-triggering it forever. A `runToken` guards against a stale poll loop (from clicking one document, then quickly clicking another) overwriting what's currently on screen. The document list is refreshed once a run actually had to wait on the background job — not on every open of an already-analyzed document — so a freshly AI-generated title/type appears without a manual reload, same as before.
+* **`DocumentGrid.tsx`** — the verdict chip gained an **"Analyzing…"** state for `document.status === "processing"`, alongside the existing risk / "Analysis failed" / "Not analyzed yet" chips.
+* **`UploadPanel.tsx`** — the dropzone now accepts and mentions photos (`accept="application/pdf,image/png,image/jpeg"`; copy: *"PDF or photo (JPG/PNG) — up to 10MB. Scanned pages are read automatically."*) — the server now OCRs a scanned PDF or a photographed document instead of only reading a PDF's text layer.
+
+---
+
+## ✅ Result (real headless-Chromium runs against the live dev server, real OpenAI calls)
+
+* Pasted text: card correctly showed "Analyzing…" (not blocked) while a real background job ran; a real 90/100 High-risk report rendered a few seconds later.
+* **Photo upload**: uploaded a rendered "eviction notice" as a PNG (no PDF/text layer) — the card again showed "Analyzing…", and the finished report correctly summarized the photographed content, proving the OCR fallback end-to-end through the real UI, not just the API.
+* Zero console errors across both runs.
+
+---

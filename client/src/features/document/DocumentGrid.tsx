@@ -28,6 +28,9 @@ const verdictFor = (doc: any): { label: string; className: string } => {
   if (doc.status === "failed") {
     return { label: "Analysis failed", className: RISK_LEVEL_BADGE.High };
   }
+  if (doc.status === "processing") {
+    return { label: "Analyzing…", className: NEUTRAL_CHIP };
+  }
   return { label: "Not analyzed yet", className: NEUTRAL_CHIP };
 };
 
