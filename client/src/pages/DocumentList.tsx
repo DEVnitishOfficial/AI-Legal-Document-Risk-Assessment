@@ -29,7 +29,11 @@ export default function DocumentList({ onSelect, refreshKey, selectedId }: Docum
 
   const getFileName = (path: string) => {
     if (!path) return "Text Document";
-    return path?.split("\\").pop().split("/").pop();
+    // Split on either separator in one pass — chaining .pop().split(...) on
+    // the intermediate array's .pop() (typed string | undefined, since an
+    // array's .pop() can't be proven non-empty) is what broke the build.
+    const parts = path.split(/[\\/]/);
+    return parts[parts.length - 1] || "Text Document";
   };
 
   return (
