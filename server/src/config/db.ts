@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
 import { env } from "./env";
+import { logger } from "./logger";
 
 // pg's pool closes idle connections after 10 s, so a quiet server keeps opening fresh
 // sockets. That is wasteful anywhere, and on a machine with a busy network stack it can
@@ -15,5 +16,5 @@ export const prisma = new PrismaClient({ adapter });
 
 prisma
   .$connect()
-  .then(() => console.log("✅ DB Connected"))
-  .catch((err) => console.error("❌ DB Error", err));
+  .then(() => logger.info("Database connected"))
+  .catch((err) => logger.error({ err }, "Database connection failed"));

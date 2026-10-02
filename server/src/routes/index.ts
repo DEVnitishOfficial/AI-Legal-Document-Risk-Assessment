@@ -11,10 +11,11 @@ import otpRoutes from "../modules/otp/otp.routes";
 import { advocateRoutes, adminAdvocateRoutes } from "../modules/advocate/advocate.routes";
 import consultationRoutes from "../modules/consultation/consultation.routes";
 import { humanRoutes, deskRoutes } from "../modules/human/human.routes";
+import { logger } from "../config/logger";
 
 
 const router = Router();
-console.log("API routes initialized");
+logger.debug("API routes initialized");
 
 router.get("/", (req, res) => {
   res.json({ message: "API v1" });

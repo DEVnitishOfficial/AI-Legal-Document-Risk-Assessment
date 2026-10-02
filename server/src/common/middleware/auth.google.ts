@@ -3,8 +3,9 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import * as userRepo from "../../modules/user/user.repository";
 import { generateToken } from "../utils/jwt";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 
-console.log("Google Strategy Loading");
+logger.debug("Google Strategy loading");
 
 try {
   passport.use(
@@ -51,7 +52,7 @@ try {
       }
     )
   );
-  console.log("Google Strategy Loaded Successfully");
+  logger.debug("Google Strategy loaded successfully");
 } catch (err) {
-  console.error("Failed to initialize Google Strategy:", err);
+  logger.error({ err }, "Failed to initialize Google Strategy");
 }

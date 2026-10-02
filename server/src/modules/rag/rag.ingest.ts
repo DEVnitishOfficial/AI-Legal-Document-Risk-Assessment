@@ -1,5 +1,6 @@
 import Firecrawl from "@mendable/firecrawl-js";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import { chunkText } from "./rag.chunk";
 import { embedAndStoreChunk } from "./rag.service";
 
@@ -61,7 +62,7 @@ export const crawlAndIngest = async (urls: string[]): Promise<IngestResult[]> =>
                 )
             );
         } catch (err) {
-            console.error(`RAG ingestion failed for ${url}:`, err);
+            logger.error({ err, url }, "RAG ingestion failed");
             results.push({
                 url,
                 status: "failed",
@@ -101,7 +102,7 @@ export const searchAndIngest = async (query: string, limit = 4): Promise<IngestR
             results.push(await ingestMarkdownDoc(url, markdown, title, publishedTime));
         }
     } catch (err) {
-        console.error(`RAG search ingestion failed for query "${query}":`, err);
+        logger.error({ err, query }, "RAG search ingestion failed");
         results.push({
             url: `search:${query}`,
             status: "failed",

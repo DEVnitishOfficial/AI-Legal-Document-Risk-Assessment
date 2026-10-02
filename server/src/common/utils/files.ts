@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { logger } from "../../config/logger";
 
 const UPLOADS_DIR = path.resolve("uploads");
 
@@ -16,7 +17,7 @@ export const removeUploadedFile = async (filePath?: string | null) => {
     await fs.promises.unlink(resolved);
   } catch (err: any) {
     if (err?.code !== "ENOENT") {
-      console.error("Could not remove uploaded file:", resolved, err?.message);
+      logger.warn({ err, file: resolved }, "Could not remove uploaded file");
     }
   }
 };

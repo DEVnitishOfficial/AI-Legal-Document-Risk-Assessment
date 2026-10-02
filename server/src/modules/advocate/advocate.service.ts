@@ -3,6 +3,7 @@ import path from "path";
 import { AppError } from "../../common/errors/AppError";
 import { removeUploadedFile } from "../../common/utils/files";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import * as repo from "./advocate.repository";
 import {
   AI_CREDENTIAL_TYPES,
@@ -340,7 +341,7 @@ export const ensureDefaultAiAdvocate = async () => {
     acceptingConsultations: true,
     aiConfig: { create: { ...DEFAULT_AI_CONFIG } },
   });
-  console.log("Created default AI advocate");
+  logger.info("Created default AI advocate");
 };
 
 // Keeps every AI advocate's "knowledge source" credentials in step with what is

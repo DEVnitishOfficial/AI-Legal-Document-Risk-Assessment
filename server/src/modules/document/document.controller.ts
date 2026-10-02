@@ -6,6 +6,7 @@ import { User } from "../../types/userType";
 import { getUserDocuments, getDocumentById } from "./document.repository";
 import { extractTextFromPDF } from "../../common/utils/pdf";
 import { AppError } from "../../common/errors/AppError";
+import { logger } from "../../config/logger";
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -40,7 +41,7 @@ export const uploadDoc = async (req: Request, res: Response, next: NextFunction)
       data: result,
     });
   } catch (err) {
-    console.error("Error in uploadDoc controller:", err);
+    logger.error({ err }, "Error in uploadDoc controller");
     next(err);
   }
 };

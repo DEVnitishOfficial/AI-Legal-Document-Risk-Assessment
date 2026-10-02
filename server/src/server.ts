@@ -1,5 +1,6 @@
 import app from "./app";
 import {env} from "./config/env";
+import { logger } from "./config/logger";
 import { startRagScheduler } from "./modules/rag/rag.scheduler";
 import { promoteConfiguredAdmins } from "./modules/user/admin.bootstrap";
 import { ensureDefaultAiAdvocate } from "./modules/advocate/advocate.service";
@@ -11,15 +12,15 @@ import { startAnalysisWorker, shutdownAnalysisWorker } from "./modules/analysis/
 const PORT = env.PORT;
 
 const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  logger.info({ port: PORT }, "Server running");
   startRagScheduler();
 
   // Startup data setup must never take the API down if the DB is briefly unavailable.
-  promoteConfiguredAdmins().catch((err) => console.error("Admin bootstrap failed:", err));
-  ensureDefaultAiAdvocate().catch((err) => console.error("Default AI advocate setup failed:", err));
+  promoteConfiguredAdmins().catch((err) => logger.error({ err }, "Admin bootstrap failed"));
+  ensureDefaultAiAdvocate().catch((err) => logger.error({ err }, "Default AI advocate setup failed"));
 
   // Live calls keep running (and billing) at OpenAI if this process dies, so hang up any left over.
-  recoverStaleSessions().catch((err) => console.error("Consultation recovery failed:", err));
+  recoverStaleSessions().catch((err) => logger.error({ err }, "Consultation recovery failed"));
 
   // Live calls with real advocates: the realtime hub (WebSocket on this port) and the timeout sweeper.
   startSweeper();

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 
 const client = new OpenAI({
     apiKey: env.OPENAI_API_KEY,
@@ -72,7 +73,7 @@ ${trimmedText}
 
         parsed = JSON.parse(cleanOutput || "{}");
     } catch (error) {
-        console.error("Failed to parse AI response:", output);
+        logger.error({ output }, "Failed to parse AI response");
         throw new Error("Invalid AI response format");
     }
 

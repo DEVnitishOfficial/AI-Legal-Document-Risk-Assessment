@@ -1,7 +1,8 @@
 import multer from "multer";
 import path from "path";
+import { logger } from "./logger";
 
-console.log("Multer configuration loaded");
+logger.debug("Multer configuration loaded");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/");

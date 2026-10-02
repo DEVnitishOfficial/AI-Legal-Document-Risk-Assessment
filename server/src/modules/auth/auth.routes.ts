@@ -1,6 +1,7 @@
 import { Router } from "express";
 import passport from "passport";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.get("/google/callback", (req, res, next) => {
     // This is a browser navigation, not an API call, so a failure must land the person back
     // on the sign-in page (which explains it) rather than on a page of raw JSON.
     if (err || !user) {
-      if (err) console.error("Google sign-in failed:", err.message);
+      if (err) logger.error({ err }, "Google sign-in failed");
       return res.redirect(`${env.CLIENT_URL}/login?error=google`);
     }
 

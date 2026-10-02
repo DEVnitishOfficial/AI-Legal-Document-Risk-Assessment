@@ -4,10 +4,11 @@ import { authMiddleware } from "../../common/middleware/auth.middleware";
 import { analysisPollRateLimiter } from "../../common/middleware/rateLimit.middleware";
 import { validate } from "../../common/middleware/validate.middleware";
 import { runAnalysisBodySchema } from "./analysis.schema";
+import { logger } from "../../config/logger";
 
 const router = Router();
 
-console.log("Analysis routes initialized");
+logger.debug("Analysis routes initialized");
 router.post(
     "/run",
     authMiddleware,

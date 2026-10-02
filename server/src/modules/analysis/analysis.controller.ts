@@ -3,6 +3,7 @@ import { getDocumentById } from "./analysis.repository";
 import { markDocumentProcessing } from "../document/document.repository";
 import { enqueueAnalysis } from "./analysis.queue";
 import { AppError } from "../../common/errors/AppError";
+import { logger } from "../../config/logger";
 
 // Re-exported for backward compatibility — the derivation itself now lives
 // in analysis.riskScore.ts (see that file for why).
@@ -64,7 +65,7 @@ export const runAnalysis = async (req: any, res: Response, next: NextFunction) =
 
         return res.status(202).json({ success: true, data: { status: "queued" } });
     } catch (err) {
-        console.error("Error occurred while running analysis:", err);
+        logger.error({ err }, "Error occurred while running analysis");
         next(err);
     }
 };

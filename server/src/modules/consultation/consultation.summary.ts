@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import { verifyCitations } from "../rag/rag.grounded";
 import * as repo from "./consultation.repository";
 import { DISCLAIMER } from "./consultation.constants";
@@ -93,7 +94,7 @@ export const generateSummary = async (consultationId: number): Promise<void> => 
             summaryStatus: "READY",
         });
     } catch (err) {
-        console.error(`Summary failed for consultation ${consultationId}:`, err instanceof Error ? err.message : err);
+        logger.error({ err, consultationId }, "Summary generation failed");
         await repo.updateConsultation(consultationId, { summaryStatus: "FAILED" }).catch(() => undefined);
     }
 };

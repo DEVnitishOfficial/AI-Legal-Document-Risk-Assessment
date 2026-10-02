@@ -1,8 +1,13 @@
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 
 export const sendOtpSms = async (phone: string, code: string): Promise<void> => {
   if (!env.MSG91_AUTH_KEY || !env.MSG91_TEMPLATE_ID) {
-    console.log(`[DEV OTP] ${phone}: ${code}`);
+    // Deliberately a plain string, not a structured `{ code }` field — the
+    // logger redacts any `code` property by default (see logger.ts), but
+    // this line only ever fires in dev/test mode and exists specifically
+    // so a developer can see the code without the API response's devCode.
+    logger.info(`[DEV OTP] ${phone}: ${code}`);
     return;
   }
 
@@ -25,7 +30,7 @@ export const sendOtpSms = async (phone: string, code: string): Promise<void> => 
 
   if (!res.ok) {
     const body = await res.text();
-    console.error("MSG91 send failed:", res.status, body);
+    logger.error({ status: res.status, body }, "MSG91 send failed");
     throw new Error("Failed to send OTP SMS");
   }
 };
