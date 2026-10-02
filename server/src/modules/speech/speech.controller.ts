@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { AppError } from "../../common/errors/AppError";
 import { transcribeAudio } from "./speech.service";
+import { logger } from "../../config/logger";
 
 // Transcribe-only endpoint: used as the fallback path for the chat input's
 // mic button when the browser's live Web Speech API isn't available —
@@ -19,7 +20,7 @@ export const transcribeHandler = async (req: any, res: Response, next: NextFunct
         try {
             transcript = await transcribeAudio(req.file.path, language);
         } catch (err) {
-            console.error("Whisper transcription failed:", err);
+            logger.error({ err }, "Whisper transcription failed");
             throw new AppError("Could not process this audio — please try recording again", 400);
         }
 

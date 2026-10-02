@@ -9,6 +9,7 @@
 
 import WebSocket from "ws";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import { searchLaw, SEARCH_LAW_TOOL, verifyCitations } from "../rag/rag.grounded";
 import * as repo from "./consultation.repository";
 import { generateSummary } from "./consultation.summary";
@@ -148,7 +149,7 @@ const record = async (
             atMs: Date.now() - s.startedAt,
         });
     } catch (err) {
-        console.error("Failed to save consultation turn:", err instanceof Error ? err.message : err);
+        logger.error({ err }, "Failed to save consultation turn");
     }
 };
 
@@ -207,7 +208,7 @@ const runSearchTool = async (s: LiveSession, ev: { call_id: string; name: string
                     note: result.note,
                 };
             } catch (err) {
-                console.error("search_law failed:", err instanceof Error ? err.message : err);
+                logger.error({ err }, "search_law failed");
                 output = {
                     found: false,
                     passages: [],
@@ -297,7 +298,10 @@ const handleEvent = async (s: LiveSession, raw: WebSocket.RawData) => {
             break;
         }
         case "error":
-            console.error(`Realtime error (consultation ${s.params.consultationId}):`, JSON.stringify(ev.error));
+            logger.error(
+                { consultationId: s.params.consultationId, realtimeError: ev.error },
+                "Realtime error"
+            );
             notice(s, `err:${ev.error?.code ?? "unknown"}`, "The connection to the advocate had a problem. If you cannot hear a reply, end the call and start again.");
             break;
     }
@@ -313,13 +317,13 @@ const attach = (s: LiveSession, isReconnect: boolean) => {
         // Let the browser finish connecting its audio before the advocate speaks first.
         if (!isReconnect) setTimeout(() => !s.ended && nudge(s, OPENING_INSTRUCTION), 1200);
     });
-    ws.on("message", (raw) => void handleEvent(s, raw).catch((e) => console.error("Realtime event error:", e)));
+    ws.on("message", (raw) => void handleEvent(s, raw).catch((e) => logger.error({ err: e }, "Realtime event error")));
     ws.on("unexpected-response", (_req, res) => {
         res.resume();
         // The call is gone (the client left, or it timed out): nothing to attach to.
         void endSession(s.params.consultationId, "call_closed");
     });
-    ws.on("error", (e) => console.error(`Sideband error (consultation ${s.params.consultationId}):`, e.message));
+    ws.on("error", (e) => logger.error({ err: e, consultationId: s.params.consultationId }, "Sideband error"));
     ws.on("close", () => {
         if (s.ended || s.ws !== ws) return;
         if (s.reconnects >= RECONNECT_LIMIT) {
@@ -386,7 +390,7 @@ export const endSession = async (consultationId: number, reason: string): Promis
             usage: s.usage,
             summaryStatus: "PENDING",
         })
-        .catch((e) => console.error("Failed to close consultation:", e));
+        .catch((e) => logger.error({ err: e, consultationId }, "Failed to close consultation"));
 
     void generateSummary(consultationId);
     return true;
@@ -416,5 +420,5 @@ export const recoverStaleSessions = async () => {
         });
         void generateSummary(c.id);
     }
-    if (stale.length) console.log(`Closed ${stale.length} consultation(s) left live by a restart`);
+    if (stale.length) logger.info({ count: stale.length }, "Closed consultation(s) left live by a restart");
 };

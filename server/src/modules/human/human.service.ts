@@ -1,5 +1,6 @@
 import { AppError } from "../../common/errors/AppError";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import * as advocateRepo from "../advocate/advocate.repository";
 import { CONSULT_LANGUAGES, INDIAN_STATES } from "../consultation/consultation.constants";
 import { toPublic } from "../consultation/consultation.shape";
@@ -362,7 +363,7 @@ export const sweep = async () => {
 };
 
 export const startSweeper = () => {
-    const timer = setInterval(() => void sweep().catch((e) => console.error("Human-call sweep failed:", e)), 10_000);
+    const timer = setInterval(() => void sweep().catch((e) => logger.error({ err: e }, "Human-call sweep failed")), 10_000);
     timer.unref();
-    void sweep().catch((e) => console.error("Human-call sweep failed:", e));
+    void sweep().catch((e) => logger.error({ err: e }, "Human-call sweep failed"));
 };

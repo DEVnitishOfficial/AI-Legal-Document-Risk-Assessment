@@ -1,5 +1,6 @@
 import { AppError } from "../../common/errors/AppError";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import * as advocates from "../advocate/advocate.repository";
 import { findUserById } from "../user/user.repository";
 import { DEFAULT_RAG } from "../rag/rag.grounded";
@@ -149,7 +150,7 @@ export const connect = async (userId: number, id: number, sdp: unknown) => {
     try {
         negotiated = await negotiateCall(sdp, buildSessionConfig(params));
     } catch (err) {
-        console.error("Realtime negotiation failed:", err instanceof Error ? err.message : err);
+        logger.error({ err }, "Realtime negotiation failed");
         await repo.updateConsultation(c.id, { status: "LOBBY" });
         throw new AppError("Could not start the call. Please try again in a moment.", 502);
     }

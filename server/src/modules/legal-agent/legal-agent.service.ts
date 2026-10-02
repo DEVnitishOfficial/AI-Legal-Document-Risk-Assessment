@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import { buildSystemPrompt, buildRoutingPrompt, buildStreamingAnswerPrompt, DISCLAIMER } from "./legal-agent.prompt";
 import { retrieveRelevantChunks } from "../rag/rag.service";
 
@@ -41,7 +42,7 @@ export const getRagContext = async (query: string): Promise<string> => {
         const chunks = await retrieveRelevantChunks(query, 4);
         return chunks.map((c) => `[${c.sourceTitle}](${c.sourceUrl}): ${c.content.slice(0, 500)}`).join("\n\n");
     } catch (err) {
-        console.error("RAG retrieval failed, continuing without it:", err);
+        logger.error({ err }, "RAG retrieval failed, continuing without it");
         return "";
     }
 };
@@ -66,7 +67,7 @@ const parseJsonResponse = (output: string | null): any => {
         const cleanOutput = output?.replace(/```json/g, "")?.replace(/```/g, "")?.trim();
         return JSON.parse(cleanOutput || "{}");
     } catch (error) {
-        console.error("Failed to parse legal-agent AI response:", output);
+        logger.error({ output }, "Failed to parse legal-agent AI response");
         throw new Error("Invalid AI response format");
     }
 };

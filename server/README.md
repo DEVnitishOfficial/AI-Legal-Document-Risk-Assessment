@@ -1568,3 +1568,36 @@ Every route validated its input by hand, if at all — some checked shape/type (
 * **Live, real browser run**: registered through the actual form, logged in, pasted a lease and got a real analysis report, and sent a real message in the Legal Assistant — confirming the new validation layer doesn't reject anything the real client actually sends.
 
 ---
+
+# 🛡️ Security Headers, Structured Logging, and API Docs (Phase 27)
+
+---
+
+## 📌 Overview
+
+Three related hardening/professionalism gaps, closed together: no security-headers middleware, ~80 scattered `console.log`/`console.error` calls instead of structured logging, and no API documentation beyond the phase-log READMEs.
+
+---
+
+## 🔑 What changed
+
+**Security headers (`helmet`)** — `app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }))`. The one deliberate override: helmet's default same-origin resource policy would make the browser block the advocate-photo `<img>` tags the client already loads cross-origin (a different port in dev, a different domain in production) — this is a pure JSON API plus one static-file directory, not an HTML app with a first-party page for the stricter default to protect.
+
+**Structured logging (`pino`)** — one `logger` (`config/logger.ts`), pretty-printed and colorized in development, plain JSON everywhere else. `pino-http` logs every request automatically. Every real `console.*` call in `src/` was converted — **80 call sites across 29 files** — except `rag.eval.ts`, a standalone CLI report script with deliberately human-formatted columnar output, not application logging.
+
+* **Secrets are redacted centrally**, not left to every call site to remember: `password`, `token`, `code`, `codeHash`, and `req.headers.authorization`/`cookie` are censored automatically. **A real bug in this, caught by actually testing the redaction's output, not just its config**: pino's `*.field` wildcard matches exactly *one* level of nesting at that position — it is not a recursive "this field at any depth" match. The first version (`paths: ["*.password", ...]`) looked correct and silently left a top-level `{ password: ... }` log completely unredacted. `logger.unit.test.ts` asserts on the actual serialized JSON output (not on the `redact` option merely being present), which is what caught it; fixed by listing every sensitive field at both the top level and one level of nesting.
+
+**API docs (`@asteasolutions/zod-to-openapi` + `swagger-ui-express`)** — `GET /api-docs` (interactive UI) and `GET /api-docs.json` (raw spec). Auth, Documents, Analysis and the Legal Assistant's endpoints are **fully** documented by reusing the exact zod schemas `validate.middleware.ts` already enforces (server README Phase 26) — the request body shown in the docs is never hand-copied, so it cannot silently drift from what the server actually accepts. The rest of the API (advocates, admin, consultations, human consultations, RAG ingestion, speech) is documented at the path level (method, auth requirement, one-line purpose) — those modules already have their own reasonably thorough hand-rolled validation that this phase deliberately didn't duplicate into zod (same scope decision as Phase 26).
+
+* **A real ordering bug, caught before it shipped**: `swagger-ui-express`'s bundled HTML page relies on an inline `<script>`, which helmet's default Content-Security-Policy (`script-src 'self'`, no `'unsafe-inline'`) silently blocks — a blank page with a CSP violation in the browser console, not an error anywhere in the server. Fixed by mounting `/api-docs` **before** `app.use(helmet(...))` in the middleware chain, so the CSP-setting middleware never runs for that one HTML page, while every JSON response elsewhere (where a CSP header is inert anyway) still gets the full header set. Verified by actually loading the page in a real browser and checking for console errors — a header-only check would not have caught this, since curl doesn't execute scripts or enforce CSP.
+
+---
+
+## ✅ Result (verified three ways: automated tests, headers/output inspected directly, and real browser runs)
+
+* **Automated**: 9 new unit tests for the logger's redaction rules (asserting on real serialized output), 7 new system tests for helmet's headers on a real response (including the cross-origin-resource-policy override, checked on both a normal route and the static advocate-photos route). **222/222 server tests**, clean type-check.
+* **A real, unrelated infrastructure issue hit and resolved mid-session**: Docker Desktop had fully stopped (not just the containers — the whole Desktop engine), surfacing as `ECONNREFUSED` on Postgres and Redis across the test suite. Relaunched from its actual (non-default) install path, confirmed both containers healthy, re-ran — 222/222 passed. Not a code bug; recorded here because it's a real, recurring gotcha on this machine (see `reference_windows_port_exhaustion`-style notes) and the first instinct must be "is the infrastructure actually up?", not "what did I just break?".
+* **Live, real dev-server boot**: the new pretty-printed logs render cleanly (`Server running`, `Database connected`, `Redis connected`, `Document analysis worker started`, each with structured fields, not string-concatenated).
+* **Live, real browser runs**: a full register→login→Connect Advocate pass confirmed the advocate photos still load (the exact thing the CORP override exists for) with zero console errors and zero failed requests; `/api-docs` loads cleanly with zero console errors, and expanding `POST /users/register` → "Try it out" shows a request-body example genuinely derived from the real schema (`email` rendered with its `user@example.com` format hint, not a bare `"string"`).
+
+---

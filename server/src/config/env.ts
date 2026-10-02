@@ -16,6 +16,12 @@ export const env = {
   RAG_INGEST_SECRET: process.env.RAG_INGEST_SECRET!,
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
   SERVER_URL: process.env.SERVER_URL || "http://localhost:3000",
+  NODE_ENV: process.env.NODE_ENV || "development",
+  // "silent" in tests by default (keeps automated test output focused on
+  // the tests themselves, not startup/request logs), "info" everywhere
+  // else. Overridable for turning up verbosity while debugging.
+  LOG_LEVEL:
+    process.env.LOG_LEVEL || (process.env.NODE_ENV === "test" ? "silent" : "info"),
   // Backs the BullMQ background job queue (document analysis) and the
   // shared, restart-durable rate-limit store.
   REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",

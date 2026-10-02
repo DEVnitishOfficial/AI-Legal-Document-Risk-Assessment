@@ -1,5 +1,6 @@
 import { prisma } from "../../config/db";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 
 // Promotes the accounts listed in ADMIN_EMAILS to ADMIN. Idempotent and
 // additive — it never demotes anyone.
@@ -14,5 +15,5 @@ export const promoteConfiguredAdmins = async () => {
     data: { role: "ADMIN" },
   });
 
-  if (count > 0) console.log(`Promoted ${count} account(s) to ADMIN from ADMIN_EMAILS`);
+  if (count > 0) logger.info({ count }, "Promoted account(s) to ADMIN from ADMIN_EMAILS");
 };

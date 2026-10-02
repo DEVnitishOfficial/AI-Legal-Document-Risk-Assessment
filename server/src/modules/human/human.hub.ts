@@ -15,6 +15,7 @@ import http from "http";
 import jwt from "jsonwebtoken";
 import WebSocket, { WebSocketServer } from "ws";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import * as repo from "./human.repository";
 import * as presence from "./human.presence";
 import { iceServersFor } from "./human.ice";
@@ -254,7 +255,7 @@ export const attachHub = (server: http.Server) => {
         }, AUTH_TIMEOUT_MS);
 
         ws.on("pong", () => (conn.alive = true));
-        ws.on("message", (raw) => void onMessage(conn, raw).catch((e) => console.error("Hub message error:", e)));
+        ws.on("message", (raw) => void onMessage(conn, raw).catch((e) => logger.error({ err: e }, "Hub message error")));
         ws.on("error", () => undefined);
         ws.on("close", () => {
             clearTimeout(authTimer);

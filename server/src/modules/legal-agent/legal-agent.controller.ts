@@ -3,6 +3,7 @@ import path from "path";
 import { Response, NextFunction } from "express";
 import { AppError } from "../../common/errors/AppError";
 import { extractTextFromPDF } from "../../common/utils/pdf";
+import { logger } from "../../config/logger";
 import {
     decideNextStep,
     routeMessage,
@@ -72,7 +73,7 @@ const buildDocumentContext = async (conversation: OwnedConversation): Promise<st
                 const text = doc.filePath ? await extractTextFromPDF(doc.filePath) : doc.content ?? "";
                 return `Document "${doc.title ?? doc.filePath ?? "attached document"}":\n${text.slice(0, 3000)}`;
             } catch (err) {
-                console.error(`Failed to read attached document ${doc.id}:`, err);
+                logger.error({ err, documentId: doc.id }, "Failed to read attached document");
                 return "";
             }
         })
@@ -288,7 +289,7 @@ export const sendMessageHandler = async (req: any, res: Response, next: NextFunc
         sendEvent({ type: "done", message: assistantMessageRow[0] });
         res.end();
     } catch (err) {
-        console.error("Error occurred while sending legal-agent message:", err);
+        logger.error({ err }, "Error occurred while sending legal-agent message");
 
         if (streaming) {
             try {
@@ -328,7 +329,7 @@ export const sendVoiceMessageHandler = async (req: any, res: Response, next: Nex
             // 500 (same discipline as the rest of this codebase: never let
             // an unwrapped upstream error reach the client as "Internal
             // Server Error").
-            console.error("Whisper transcription failed:", err);
+            logger.error({ err }, "Whisper transcription failed");
             throw new AppError("Could not process this audio — please try recording again", 400);
         }
 
@@ -343,7 +344,7 @@ export const sendVoiceMessageHandler = async (req: any, res: Response, next: Nex
 
         res.json({ success: true, data: { result, userMessage, message } });
     } catch (err) {
-        console.error("Error occurred while sending legal-agent voice message:", err);
+        logger.error({ err }, "Error occurred while sending legal-agent voice message");
         next(err);
     }
 };

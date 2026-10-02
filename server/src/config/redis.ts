@@ -1,5 +1,6 @@
 import IORedis from "ioredis";
 import { env } from "./env";
+import { logger } from "./logger";
 
 // One shared connection, reused by every BullMQ Queue/Worker in this
 // process and by the Redis-backed rate limiter. BullMQ requires
@@ -11,9 +12,9 @@ export const redisConnection = new IORedis(env.REDIS_URL, {
 });
 
 redisConnection.on("error", (err) => {
-  console.error("❌ Redis connection error:", err.message);
+  logger.error({ err }, "Redis connection error");
 });
 
 redisConnection.on("connect", () => {
-  console.log("✅ Redis connected");
+  logger.info("Redis connected");
 });

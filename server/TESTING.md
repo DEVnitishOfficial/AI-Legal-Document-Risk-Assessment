@@ -77,7 +77,9 @@ interfering with each other.
   body/params/query, formats the first Zod issue into a friendly `400`),
   `idParamSchema`/`phoneSchema`, and every `*.schema.ts` (user, otp,
   document, analysis, legal-agent) — the actual accept/reject rules for
-  every field on every newly-validated route.
+  every field on every newly-validated route. Also: `logger.ts`'s redact
+  rules (asserted against the real serialized JSON output, not just that a
+  `redact` option is present — see the "bug this caught" note below).
 - **System**: register → login → protected-route flow; document
   create/read/rename/delete; the **IDOR ownership guard** on documents and
   on analysis (a real historical bug in this codebase — one user could
@@ -116,6 +118,21 @@ interfering with each other.
   against the real routes; malformed input never reaches user.service.ts,
   document.service.ts, etc., and a non-numeric `:id` that used to reach
   Prisma unguarded now gets a clean `400`).
+
+  Also: helmet's security headers on a real response, including the one
+  deliberate override (`cross-origin-resource-policy: cross-origin`, so
+  the client can load advocate photos cross-origin) checked on both a
+  normal route and the static advocate-photos route specifically.
+
+  **A bug caught here, not by type-checking or by the option merely being
+  set**: `logger.ts`'s redact config originally used `*.password` (and
+  similar) alone. Pino's `*` wildcard matches exactly *one* level of
+  nesting at that position, not "this field at any depth" — a top-level
+  `{ password: ... }` log was silently left completely unredacted.
+  `logger.unit.test.ts` builds a real pino instance writing to an
+  in-memory sink and asserts on the actual serialized output; that's what
+  caught it. Fixed by listing every sensitive field at both the top level
+  and one level of nesting.
 
 ## Known gaps (not covered yet)
 

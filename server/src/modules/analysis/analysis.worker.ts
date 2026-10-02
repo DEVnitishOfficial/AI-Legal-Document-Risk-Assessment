@@ -6,6 +6,7 @@ import { markDocumentAnalyzed, markDocumentFailed } from "../document/document.r
 import { analyzeDocument } from "./analysis.service";
 import { riskScoreForLevel } from "./analysis.riskScore";
 import { extractDocumentText, MIN_USABLE_TEXT_LENGTH } from "./analysis.textExtraction";
+import { logger } from "../../config/logger";
 
 // How many analyses can run at once. Caps both the OpenAI request rate (a
 // runaway burst of uploads can't turn into a wall of simultaneous API
@@ -26,11 +27,11 @@ export const processAnalysisJob = async (data: AnalysisJobData) => {
 
   const doc = await getDocumentById(documentId);
   if (!doc) {
-    console.log(`Analysis job for document ${documentId}: document no longer exists, skipping.`);
+    logger.info({ documentId }, "Analysis job skipped: document no longer exists");
     return;
   }
   if (doc.analysis) {
-    console.log(`Analysis job for document ${documentId}: already analyzed, skipping.`);
+    logger.info({ documentId }, "Analysis job skipped: already analyzed");
     return;
   }
 
@@ -89,7 +90,7 @@ export const analysisJobProcessor = async (job: Job<AnalysisJobData>) => {
 
     if (isFinalAttempt) {
       await markDocumentFailed(job.data.documentId).catch((markErr) =>
-        console.error(`Could not mark document ${job.data.documentId} as failed:`, markErr)
+        logger.error({ err: markErr, documentId: job.data.documentId }, "Could not mark document as failed")
       );
     }
 
@@ -108,10 +109,10 @@ export const startAnalysisWorker = (): Worker<AnalysisJobData> => {
   });
 
   worker.on("failed", (job, err) => {
-    console.error(`Analysis job for document ${job?.data.documentId} failed:`, err.message);
+    logger.error({ err, documentId: job?.data.documentId }, "Analysis job failed");
   });
 
-  console.log(`📄 Document analysis worker started (concurrency ${ANALYSIS_CONCURRENCY})`);
+  logger.info({ concurrency: ANALYSIS_CONCURRENCY }, "Document analysis worker started");
   return worker;
 };
 
